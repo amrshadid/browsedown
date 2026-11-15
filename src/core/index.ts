@@ -21,6 +21,7 @@ export {
   type OutlineEntry,
   type PageOptions,
 } from './pages';
+export { IgnoreRules } from './ignoreWalk';
 export { resolveLink, type LinkTarget } from './links';
 export {
   entryUrl,
