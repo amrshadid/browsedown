@@ -1,0 +1,564 @@
+/*
+ * Page chrome for Browsedown previews: header, file tree, file box, outline.
+ * The document itself is styled by github-markdown-css. Colours follow GitHub's
+ * light and dark themes and switch with the system setting. No inline styles are
+ * allowed by the CSP, so everything visual lives here.
+ */
+
+:root {
+  color-scheme: light dark;
+  --bd-bg: #ffffff;
+  --bd-bg-muted: #f6f8fa;
+  --bd-bg-hover: rgba(208, 215, 222, 0.32);
+  --bd-bg-selected: rgba(208, 215, 222, 0.48);
+  --bd-border: #d1d9e0;
+  --bd-fg: #1f2328;
+  --bd-fg-muted: #59636e;
+  --bd-accent: #0969da;
+  --bd-folder: #54aeff;
+  --bd-focus: #0969da;
+  --bd-shadow: 0 8px 24px rgba(140, 149, 159, 0.2);
+  --bd-header-h: 52px;
+  --bd-tree-w: 296px;
+  --bd-outline-w: 264px;
+  --bd-font:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+}
+
+/* Dark colours: when the system is dark and the reader picked no theme, or when they picked dark. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-bd-theme]) {
+    color-scheme: dark;
+    --bd-bg: #0d1117;
+    --bd-bg-muted: #151b23;
+    --bd-bg-hover: rgba(101, 108, 118, 0.2);
+    --bd-bg-selected: rgba(101, 108, 118, 0.32);
+    --bd-border: #3d444d;
+    --bd-fg: #f0f6fc;
+    --bd-fg-muted: #9198a1;
+    --bd-accent: #4493f8;
+    --bd-folder: #9198a1;
+    --bd-focus: #1f6feb;
+    --bd-shadow: 0 8px 24px rgba(1, 4, 9, 0.75);
+  }
+}
+
+:root[data-bd-theme='dark'] {
+  color-scheme: dark;
+  --bd-bg: #0d1117;
+  --bd-bg-muted: #151b23;
+  --bd-bg-hover: rgba(101, 108, 118, 0.2);
+  --bd-bg-selected: rgba(101, 108, 118, 0.32);
+  --bd-border: #3d444d;
+  --bd-fg: #f0f6fc;
+  --bd-fg-muted: #9198a1;
+  --bd-accent: #4493f8;
+  --bd-folder: #9198a1;
+  --bd-focus: #1f6feb;
+  --bd-shadow: 0 8px 24px rgba(1, 4, 9, 0.75);
+}
+
+:root[data-bd-theme='light'] {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bd-bg);
+  color: var(--bd-fg);
+  font-family: var(--bd-font);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+html {
+  scroll-padding-top: calc(var(--bd-header-h) + 16px);
+}
+
+:focus-visible {
+  outline: 2px solid var(--bd-focus);
+  outline-offset: -2px;
+  border-radius: 6px;
+}
+
+.bd-skip {
+  position: absolute;
+  left: 8px;
+  top: -48px;
+  z-index: 100;
+  padding: 8px 12px;
+  background: var(--bd-bg);
+  color: var(--bd-accent);
+  border: 1px solid var(--bd-border);
+  border-radius: 6px;
+}
+
+.bd-skip:focus {
+  top: 8px;
+}
+
+.bd-icon {
+  flex: none;
+  fill: currentColor;
+}
+
+/* ---------- Header ---------- */
+
+.bd-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--bd-header-h);
+  padding: 0 16px;
+  background: var(--bd-bg-muted);
+  border-bottom: 1px solid var(--bd-border);
+}
+
+.bd-crumbs {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.bd-crumbs > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bd-crumb-root {
+  color: var(--bd-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.bd-crumb-root:hover {
+  text-decoration: underline;
+}
+
+.bd-crumb-sep {
+  flex: none;
+  color: var(--bd-fg-muted);
+}
+
+.bd-crumbs span:not(.bd-crumb-sep) {
+  color: var(--bd-fg-muted);
+}
+
+.bd-crumbs .bd-crumb-current {
+  color: var(--bd-fg);
+  font-weight: 600;
+}
+
+.bd-icon-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--bd-fg-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.bd-icon-button:hover {
+  color: var(--bd-fg);
+  background: var(--bd-bg-hover);
+}
+
+.bd-header .bd-icon-button {
+  border-color: var(--bd-border);
+  background: var(--bd-bg);
+}
+
+.bd-header .bd-icon-button[aria-expanded='true'] {
+  color: var(--bd-fg);
+  background: var(--bd-bg-selected);
+}
+
+/* Theme switch: show the icon for the current choice. */
+.bd-theme-icon {
+  display: none;
+}
+html:not([data-bd-theme]) .bd-icon-theme-system,
+html[data-bd-theme='light'] .bd-icon-theme-light,
+html[data-bd-theme='dark'] .bd-icon-theme-dark {
+  display: block;
+}
+
+/* The toggles only make sense with the script. */
+html:not([data-bd-js]) [data-bd-theme-toggle],
+html:not([data-bd-js]) [data-bd-toggle],
+html:not([data-bd-js]) [data-bd-close] {
+  display: none;
+}
+
+/* ---------- Layout ---------- */
+
+.bd-layout {
+  display: flex;
+  align-items: flex-start;
+}
+
+.bd-main {
+  flex: 1;
+  min-width: 0;
+  padding: 24px;
+}
+
+.bd-file {
+  /* Edge to edge between the panels: reading width is the reader's choice (resize or close panels). */
+  margin: 0;
+  border: 1px solid var(--bd-border);
+  border-radius: 6px;
+  background: var(--bd-bg);
+}
+
+.bd-file-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  min-height: 48px;
+  color: var(--bd-fg-muted);
+  background: var(--bd-bg-muted);
+  border-bottom: 1px solid var(--bd-border);
+  border-radius: 6px 6px 0 0;
+}
+
+.bd-file-name {
+  color: var(--bd-fg);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.bd-label {
+  padding: 0 7px;
+  font-size: 12px;
+  line-height: 18px;
+  border: 1px solid var(--bd-border);
+  border-radius: 2em;
+}
+
+.markdown-body {
+  padding: 32px;
+  background: transparent;
+}
+
+/* ---------- Panels (tree and outline) ---------- */
+
+.bd-panel {
+  position: sticky;
+  top: var(--bd-header-h);
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  height: calc(100vh - var(--bd-header-h));
+  background: var(--bd-bg);
+}
+
+.bd-tree {
+  width: var(--bd-tree-w);
+  border-right: 1px solid var(--bd-border);
+}
+
+.bd-outline {
+  width: var(--bd-outline-w);
+  border-left: 1px solid var(--bd-border);
+}
+
+html[data-bd-tree='closed'] .bd-tree,
+html[data-bd-outline='closed'] .bd-outline {
+  display: none;
+}
+
+.bd-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 8px 8px 16px;
+}
+
+.bd-panel-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.bd-panel-body {
+  flex: 1;
+  overflow: auto;
+  padding: 0 8px 16px;
+  overscroll-behavior: contain;
+}
+
+/* ---------- File tree ---------- */
+
+.bd-tree-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.bd-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 8px;
+  color: var(--bd-fg);
+  text-decoration: none;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.bd-row:hover {
+  background: var(--bd-bg-hover);
+}
+
+.bd-row > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+summary.bd-row {
+  list-style: none;
+}
+
+summary.bd-row::-webkit-details-marker {
+  display: none;
+}
+
+.bd-i-chevron,
+.bd-i-folder,
+.bd-i-file {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  background-color: currentColor;
+  -webkit-mask: var(--bd-i) center / 16px 16px no-repeat;
+  mask: var(--bd-i) center / 16px 16px no-repeat;
+}
+
+/* Row icons are painted here, not inlined per row: a large tree has thousands of rows. */
+.bd-i-chevron {
+  --bd-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6 4l4 4-4 4' fill='none' stroke='black' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  color: var(--bd-fg-muted);
+  transition: transform 0.12s ease;
+}
+
+details[open] > summary .bd-i-chevron {
+  transform: rotate(90deg);
+}
+
+.bd-i-folder {
+  --bd-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1.75 3.5c0-.55.45-1 1-1h3.1l1.4 1.5h6c.55 0 1 .45 1 1v7c0 .55-.45 1-1 1H2.75c-.55 0-1-.45-1-1z'/%3E%3C/svg%3E");
+  color: var(--bd-folder);
+}
+
+.bd-i-file {
+  --bd-i: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4 1.75h5.25L12.5 5v9.25H4z M9 1.75V5.25h3.5' fill='none' stroke='black' stroke-width='1.25' stroke-linejoin='round'/%3E%3C/svg%3E");
+  color: var(--bd-fg-muted);
+}
+
+/* Files have no chevron: line their icon up with the folder icons. */
+a.bd-row[data-depth='0'] {
+  padding-left: 30px;
+}
+
+.bd-row[aria-current='page'] {
+  background: var(--bd-bg-selected);
+  font-weight: 600;
+}
+
+.bd-row[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 6px;
+  bottom: 6px;
+  width: 4px;
+  border-radius: 6px;
+  background: var(--bd-accent);
+}
+
+/* Indentation by depth (no inline styles allowed). */
+/* Folder rows: 8px + 16px per level. File rows: 22px more (chevron + gap). */
+summary.bd-row[data-depth='1'] {
+  padding-left: 24px;
+}
+a.bd-row[data-depth='1'] {
+  padding-left: 46px;
+}
+summary.bd-row[data-depth='2'] {
+  padding-left: 40px;
+}
+a.bd-row[data-depth='2'] {
+  padding-left: 62px;
+}
+summary.bd-row[data-depth='3'] {
+  padding-left: 56px;
+}
+a.bd-row[data-depth='3'] {
+  padding-left: 78px;
+}
+summary.bd-row[data-depth='4'] {
+  padding-left: 72px;
+}
+a.bd-row[data-depth='4'] {
+  padding-left: 94px;
+}
+summary.bd-row[data-depth='5'] {
+  padding-left: 88px;
+}
+a.bd-row[data-depth='5'] {
+  padding-left: 110px;
+}
+summary.bd-row[data-depth='6'],
+summary.bd-row[data-depth='7'],
+summary.bd-row[data-depth='8'] {
+  padding-left: 104px;
+}
+a.bd-row[data-depth='6'],
+a.bd-row[data-depth='7'],
+a.bd-row[data-depth='8'] {
+  padding-left: 126px;
+}
+
+/* ---------- Outline ---------- */
+
+/* A guide line down the left; the current section lights up its segment of it. */
+.bd-outline-list {
+  list-style: none;
+  margin: 4px 0 0 8px;
+  padding: 0;
+  border-left: 1px solid var(--bd-border);
+}
+
+.bd-outline-link {
+  display: block;
+  margin-left: -1px;
+  padding: 4px 8px 4px 12px;
+  color: var(--bd-fg-muted);
+  font-size: 13px;
+  line-height: 20px;
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  overflow-wrap: anywhere;
+}
+
+.bd-outline-link:hover {
+  color: var(--bd-fg);
+  border-left-color: var(--bd-fg-muted);
+}
+
+.bd-outline-link[aria-current='location'] {
+  color: var(--bd-fg);
+  font-weight: 600;
+  border-left-color: var(--bd-accent);
+}
+
+.bd-outline-link[data-depth='1'] {
+  padding-left: 24px;
+}
+.bd-outline-link[data-depth='2'] {
+  padding-left: 36px;
+}
+.bd-outline-link[data-depth='3'],
+.bd-outline-link[data-depth='4'],
+.bd-outline-link[data-depth='5'] {
+  padding-left: 48px;
+}
+
+/* ---------- Narrow screens: panels float over the page ---------- */
+
+@media (max-width: 1279px) {
+  html[data-bd-js] .bd-outline {
+    position: fixed;
+    right: 0;
+    z-index: 30;
+    box-shadow: var(--bd-shadow);
+  }
+}
+
+@media (max-width: 767px) {
+  html[data-bd-js] .bd-tree {
+    position: fixed;
+    left: 0;
+    z-index: 30;
+    width: min(var(--bd-tree-w), 85vw);
+    box-shadow: var(--bd-shadow);
+  }
+
+  html[data-bd-js] .bd-outline {
+    width: min(var(--bd-outline-w), 85vw);
+  }
+
+  .bd-main {
+    padding: 16px;
+  }
+
+  .markdown-body {
+    padding: 16px;
+  }
+
+  /* Without the script, stack the tree above the page and leave the outline out. */
+  html:not([data-bd-js]) .bd-layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  html:not([data-bd-js]) .bd-panel {
+    position: static;
+    width: auto;
+    height: auto;
+    border: 0;
+    border-bottom: 1px solid var(--bd-border);
+  }
+
+  html:not([data-bd-js]) .bd-outline {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bd-i-chevron {
+    transition: none;
+  }
+}
+
+/* A remote image the preview didn't load (no network requests). */
+.bd-remote-image {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  color: var(--bd-fg-muted);
+  font-size: 12px;
+  border: 1px dashed var(--bd-border);
+  border-radius: 6px;
+}
+
+.bd-remote-image::before {
+  content: '⊘ ';
+  margin-right: 2px;
+}
