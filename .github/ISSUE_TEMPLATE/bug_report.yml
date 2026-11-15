@@ -1,0 +1,46 @@
+name: Bug report
+description: Something doesn't render or navigate as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please don't report security problems here. See SECURITY.md for private reporting.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: sample
+    attributes:
+      label: Minimal Markdown sample
+      description: The smallest Markdown (and folder layout, if it matters) that shows the problem.
+      render: markdown
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Right-click docs/ → Open in Browser
+        2. Follow the link to …
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      placeholder: Browsedown 0.1.0, VS Code 1.10x, browser, macOS 15
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Output log
+      description: Paste the "Browsedown" output channel (View → Output).
+      render: text

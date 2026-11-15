@@ -1,0 +1,21 @@
+name: Feature request
+description: Suggest an improvement.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Browsedown deliberately does one thing: it opens the folder or file you picked
+        as readable, linked pages in your browser. Live reload, search, site generation,
+        Mermaid and math are out of scope for v0.x.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What were you trying to read?
+      description: Describe the situation, not the solution. What did you still have to open elsewhere?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
