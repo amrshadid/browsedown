@@ -1,0 +1,46 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # The rendering pipeline is tested as one unit (golden HTML), so its
+      # packages move together. A diff in the golden test is a review point.
+      unified:
+        patterns:
+          - 'unified'
+          - 'remark-*'
+          - 'rehype-*'
+          - 'unist-*'
+          - 'hast-*'
+          - 'mdast-*'
+          - 'lowlight'
+          - 'highlight.js'
+          - 'github-markdown-css'
+          - '@types/hast'
+      dev-dependencies:
+        dependency-type: development
+    ignore:
+      # Must match the minimum VS Code version in `engines.vscode`. Newer types
+      # would allow APIs that don't exist on older VS Code, and vsce refuses to
+      # package when they don't match. Bump together with `engines` by hand.
+      - dependency-name: '@types/vscode'
+      # VS Code's extension host runs Node 22; the types should describe it.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
+      # Pinned to the version lowlight resolves (~11.11), so the theme CSS and the
+      # grammars come from one copy. Bump together with lowlight by hand.
+      - dependency-name: 'highlight.js'
+      # typescript-eslint supports TypeScript < 6.1. Revisit when it supports 7.
+      - dependency-name: 'typescript'
+        update-types: ['version-update:semver-major']
+    commit-message:
+      prefix: build
+      include: scope
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
