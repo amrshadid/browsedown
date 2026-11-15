@@ -1,0 +1,477 @@
+/**
+ * The security checklist as one table: a row for every control, run end to end
+ * against the real preview server over HTTP, serving a real repository with real
+ * symlinks. Run it again before every release.
+ *
+ * Detailed tables live next to each component (scope.test.ts, scopedFile.test.ts,
+ * links.test.ts, markdown.test.ts, pages.test.ts).
+ */
+import * as http from 'node:http';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+
+import { pathFlavor, resolveRequestPath } from '../../src/adapters/scopedFile';
+import { newToken, PreviewServer, tokensEqual } from '../../src/adapters/server';
+import {
+  applyDiscovery,
+  checkScopedPath,
+  entryUrl,
+  fileUrl,
+  SessionStore,
+  type Session,
+} from '../../src/core';
+import {
+  createIgnoreTableRepo,
+  ESCAPE_LINKS,
+  type IgnoreTableRepo,
+} from '../support/ignoreTableRepo';
+
+interface Response {
+  readonly status: number;
+  readonly headers: http.IncomingHttpHeaders;
+  readonly body: string;
+}
+
+let repo: IgnoreTableRepo;
+let docs: string;
+let assets: string;
+let server: PreviewServer;
+let port: number;
+let session: Session;
+const logs: string[] = [];
+
+/** Sends a raw request: the target is sent exactly as given, and Host can be spoofed. */
+function request(
+  target: string,
+  options: { method?: string; host?: string; headers?: Record<string, string> } = {},
+): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      {
+        host: '127.0.0.1',
+        port,
+        path: target,
+        method: options.method ?? 'GET',
+        headers: { host: options.host ?? `127.0.0.1:${port}`, ...options.headers },
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk: Buffer) => chunks.push(chunk));
+        res.on('end', () => {
+          resolve({
+            status: res.statusCode ?? 0,
+            headers: res.headers,
+            body: Buffer.concat(chunks).toString('utf8'),
+          });
+        });
+      },
+    );
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+const file = (path: string): string => `/s/${session.token}/f/${path}`;
+
+beforeAll(async () => {
+  repo = createIgnoreTableRepo();
+  docs = join(repo.root, 'docs');
+  writeFileSync(
+    join(docs, 'evil.svg'),
+    '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>',
+  );
+  writeFileSync(
+    join(docs, 'hostile.md'),
+    [
+      '# Hostile',
+      '<script>alert(1)</script><img src=x onerror=alert(1)>',
+      '[up](../../../etc/passwd) [agent](../.agent/notes.md) [in](a.md#a) [web](https://example.com)',
+      '![badge](https://img.shields.io/x.svg)',
+      '',
+    ].join('\n'),
+  );
+  assets = mkdtempSync(join(tmpdir(), 'browsedown-assets-'));
+  for (const name of ['github-markdown.css', 'highlight.css', 'page.css', 'sidebar.js']) {
+    writeFileSync(join(assets, name), `/* ${name} */`);
+  }
+  const sessions = new SessionStore(tokensEqual);
+  session = {
+    token: newToken(),
+    mode: 'folder',
+    scopeRoot: docs,
+    scopeName: 'docs',
+    entry: undefined,
+    files: [],
+    tree: [],
+    treeHtml: undefined,
+    discovery: undefined,
+    truncated: false,
+    fresh: false,
+  };
+  applyDiscovery(session, {
+    files: ['README.md', 'a.md', 'hostile.md'],
+    discovery: 'git',
+    truncated: false,
+  });
+  sessions.add(session);
+  server = new PreviewServer({
+    sessions,
+    assetsDir: assets,
+    rediscover: () => Promise.resolve(),
+    log: (message) => logs.push(message),
+  });
+  port = await server.start();
+});
+
+afterAll(async () => {
+  await server.close();
+  repo.cleanup();
+  rmSync(assets, { recursive: true, force: true });
+});
+
+const SECURITY_HEADERS = {
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'no-referrer',
+  'x-frame-options': 'DENY',
+  'cross-origin-opener-policy': 'same-origin',
+  'cross-origin-resource-policy': 'same-origin',
+  'cache-control': 'no-store',
+};
+
+/** Every one of these must be refused, and must not leak the outside file's text. */
+async function expectRefused(...targets: string[]): Promise<void> {
+  for (const target of targets) {
+    const res = await request(file(target));
+    expect(res.status, target).toBe(404);
+    expect(res.body, target).not.toContain('# .agent/notes.md');
+    expect(res.body, target).not.toContain('# Outside the repo');
+  }
+}
+
+/**
+ * Refused by the spelling half on its own, and by the whole guard. The disk half
+ * would also catch most of these, which would hide a regression in the spelling
+ * half from an end-to-end check alone, so each half is checked.
+ */
+async function expectBlockedLexically(...encodedPaths: string[]): Promise<void> {
+  for (const encoded of encodedPaths) {
+    expect(checkScopedPath(encoded, pathFlavor()).ok, encoded).toBe(false);
+    expect(await resolveRequestPath(docs, encoded), encoded).toBeUndefined();
+  }
+  await expectRefused(...encodedPaths);
+}
+
+/**
+ * Dangerous on Windows only (drive letters, backslashes, NTFS streams). There the
+ * spelling half refuses them; on POSIX they are ordinary names, so they must
+ * simply lead nowhere. Either way the request is refused and leaks nothing.
+ */
+async function expectBlockedForThisPlatform(...encodedPaths: string[]): Promise<void> {
+  if (pathFlavor() === 'windows') {
+    await expectBlockedLexically(...encodedPaths);
+    return;
+  }
+  for (const encoded of encodedPaths) {
+    expect((await resolveRequestPath(docs, encoded))?.real, encoded).toBeUndefined();
+  }
+  await expectRefused(...encodedPaths);
+}
+
+interface Row {
+  /** The area of the control: network, requests, token, headers, files, paths, scripts, logs. */
+  readonly area: string;
+  readonly control: string;
+  readonly run?: () => Promise<void>;
+  /** Rows checked elsewhere say where, and are listed as todo here. */
+  readonly checkedIn?: string;
+}
+
+const rows: Row[] = [
+  {
+    area: 'network',
+    control: 'binds 127.0.0.1 on an OS-chosen port',
+    run: async () => {
+      expect(server.boundAddress).toBe('127.0.0.1');
+      expect(port).toBeGreaterThan(0);
+      expect(server.url('/x')).toBe(`http://127.0.0.1:${port}/x`);
+      await Promise.resolve();
+    },
+  },
+  {
+    area: 'network',
+    control: 'closes on request, and refuses connections afterwards',
+    run: async () => {
+      const other = new PreviewServer({
+        sessions: new SessionStore(tokensEqual),
+        assetsDir: assets,
+        rediscover: () => Promise.resolve(),
+        log: () => undefined,
+      });
+      const otherPort = await other.start();
+      await other.close();
+      expect(other.boundAddress).toBeUndefined();
+      await expect(
+        new Promise((resolve, reject) => {
+          http.get({ host: '127.0.0.1', port: otherPort, path: '/' }, resolve).on('error', reject);
+        }),
+      ).rejects.toThrow(/ECONNREFUSED/);
+    },
+  },
+  {
+    area: 'requests',
+    control: 'answers 421 to a spoofed Host (DNS rebinding)',
+    run: async () => {
+      for (const host of [
+        'evil.example',
+        `evil.example:${port}`,
+        '127.0.0.1',
+        `127.0.0.1:${port}.evil.example`,
+        `0.0.0.0:${port}`,
+        `[::1]:${port}`,
+      ]) {
+        expect((await request(entryUrl(session.token), { host })).status, host).toBe(421);
+      }
+      expect((await request(entryUrl(session.token), { host: `localhost:${port}` })).status).toBe(
+        302,
+      );
+    },
+  },
+  {
+    area: 'requests',
+    control: 'answers 405 to POST and every other method',
+    run: async () => {
+      for (const method of ['POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']) {
+        const res = await request(file('a.md'), { method });
+        expect(res.status, method).toBe(405);
+        expect(res.headers.allow).toBe('GET, HEAD');
+      }
+      const head = await request(file('a.md'), { method: 'HEAD' });
+      expect(head.status).toBe(200);
+      expect(head.body).toBe('');
+    },
+  },
+  {
+    area: 'requests',
+    control: 'rejects a cross-origin Origin header',
+    run: async () => {
+      const from = async (origin: string): Promise<number> =>
+        (await request(file('a.md'), { headers: { origin } })).status;
+      expect(await from('http://evil.example')).toBe(403);
+      expect(await from('null')).toBe(403);
+      expect(await from(`http://127.0.0.1:${port}`)).toBe(200);
+    },
+  },
+  {
+    area: 'token',
+    control: 'answers 404 to an unknown or malformed token, the same as any unknown route',
+    run: async () => {
+      const unknown = await request(`/s/${newToken()}/f/a.md`);
+      const malformed = await request('/s/abc/f/a.md');
+      const nowhere = await request('/nowhere');
+      for (const res of [unknown, malformed, nowhere]) {
+        expect(res.status).toBe(404);
+        expect(res.body).toBe(nowhere.body);
+      }
+      expect(tokensEqual(session.token, `${session.token.slice(0, -1)}x`)).toBe(false);
+      expect(tokensEqual(session.token, session.token.slice(1))).toBe(false);
+    },
+  },
+  {
+    area: 'headers',
+    control: 'sends a CSP with a fresh nonce per page, and the security headers on every response',
+    run: async () => {
+      const first = await request(file('a.md'));
+      const second = await request(file('a.md'));
+      const csp = (res: Response): string => String(res.headers['content-security-policy']);
+      const nonce = (res: Response): string =>
+        /script-src 'nonce-([^']+)'/.exec(csp(res))?.[1] ?? '';
+      expect(nonce(first)).not.toBe('');
+      expect(nonce(first)).not.toBe(nonce(second));
+      expect(csp(first)).toContain("default-src 'none'");
+      expect(csp(first)).toContain("img-src 'self' data:");
+      expect(csp(first)).toContain("frame-ancestors 'none'");
+      expect(first.headers['content-type']).toBe('text/html; charset=utf-8');
+      for (const res of [
+        first,
+        await request('/__assets/page.css'),
+        await request('/nowhere'),
+        await request(file('a.md'), { method: 'POST' }),
+        await request(file('a.md'), { host: 'evil.example' }),
+      ]) {
+        expect(res.headers).toMatchObject(SECURITY_HEADERS);
+        expect(res.headers['content-security-policy']).toBeDefined();
+      }
+    },
+  },
+  {
+    area: 'headers',
+    control: 'never sends CORS headers',
+    run: async () => {
+      const responses = [
+        await request(file('a.md'), { headers: { origin: `http://127.0.0.1:${port}` } }),
+        await request(file('a.md'), {
+          method: 'OPTIONS',
+          headers: { origin: 'http://evil.example' },
+        }),
+        await request('/__assets/sidebar.js'),
+      ];
+      for (const res of responses) {
+        expect(Object.keys(res.headers).filter((h) => h.startsWith('access-control-'))).toEqual([]);
+      }
+    },
+  },
+  {
+    area: 'files',
+    control: 'serves only Markdown, YAML and images; everything else is 404',
+    run: async () => {
+      expect((await request(file('a.md'))).status).toBe(200);
+      expect((await request(file('ignored.yml'))).status).toBe(200);
+      expect((await request(file('img/logo.png'))).headers['content-type']).toBe('image/png');
+      for (const path of ['x.txt', 'c.log', '..%2F.gitignore', 'evil.svg.txt']) {
+        expect((await request(file(path))).status, path).toBe(404);
+      }
+      expect((await request('/__assets/extension.js')).status).toBe(404);
+    },
+  },
+  {
+    area: 'files',
+    control: 'serves raw images with a sandbox CSP, so a direct SVG cannot run script',
+    run: async () => {
+      const svg = await request(file('evil.svg'));
+      expect(svg.status).toBe(200);
+      expect(svg.headers['content-type']).toBe('image/svg+xml');
+      expect(svg.headers['content-security-policy']).toBe(
+        "default-src 'none'; style-src 'unsafe-inline'; sandbox",
+      );
+    },
+  },
+  {
+    area: 'paths',
+    control: 'blocks traversal: ../ plain and %2e%2e%2f encoded',
+    run: () =>
+      expectBlockedLexically(
+        '%2e%2e/.agent/notes.md',
+        '%2e%2e%2f.agent%2fnotes.md',
+        '%2E%2E%2F%2E%2E%2F..%2Fetc%2Fpasswd',
+        'a.md/%2e%2e/%2e%2e/.agent/notes.md',
+      ),
+  },
+  {
+    area: 'paths',
+    control: 'decodes once: %252e%252e stays a literal name',
+    run: () => expectRefused('%252e%252e/.agent/notes.md', '%252e%252e%252f.agent%252fnotes.md'),
+  },
+  {
+    area: 'paths',
+    control: 'blocks absolute and UNC paths everywhere, drive letters and backslashes',
+    run: async () => {
+      await expectBlockedLexically(
+        `/${repo.outside}/secret.md`.replace(/\/\/+/g, '/'),
+        '//server/share/a.md',
+      );
+      await expectBlockedForThisPlatform(
+        encodeURIComponent(join(repo.outside, 'secret.md')),
+        'C:%2FWindows%2Fwin.ini',
+        'C:',
+        '%5C%5Cserver%5Cshare%5Ca.md',
+        '..%5C.agent%5Cnotes.md',
+      );
+    },
+  },
+  {
+    area: 'paths',
+    control: 'blocks NUL everywhere, and NTFS alternate data streams',
+    run: async () => {
+      await expectBlockedLexically('a.md%00.png');
+      await expectBlockedForThisPlatform('a.md:secret', 'a.md::$DATA');
+    },
+  },
+  {
+    area: 'paths',
+    control: 'blocks symlinks that escape the root (file and folder)',
+    run: async () => {
+      if (!repo.symlinks) {
+        return; // No symlink rights (Windows): covered by the injected test in scopedFile.test.ts.
+      }
+      await expectRefused(
+        ESCAPE_LINKS.file.replace('docs/', ''),
+        `${ESCAPE_LINKS.dir.replace('docs/', '')}/secret.md`,
+      );
+    },
+  },
+  {
+    area: 'paths',
+    control: 'still serves in-scope files, including ignored ones a link may point to',
+    run: async () => {
+      const res = await request(file('ignored.md'));
+      expect(res.status).toBe(200);
+      expect(res.body).toContain('docs/ignored.md');
+    },
+  },
+  {
+    area: 'paths',
+    control: 'applies the guard to every rewritten link',
+    run: async () => {
+      const { body } = await request(file('hostile.md'));
+      const article = /<article[\s\S]*<\/article>/.exec(body)?.[0] ?? '';
+      const hrefs = article.match(/href="[^"]*"/g) ?? [];
+      expect(hrefs).toContain(`href="${fileUrl(session.token, 'a.md')}#a"`);
+      expect(hrefs).toContain('href="https://example.com"');
+      // Both climb out of docs/: they go to the explanation page, never to a file.
+      for (const ref of ['../../../etc/passwd', '../.agent/notes.md']) {
+        const query = new URLSearchParams({ ref, why: 'outside' }).toString();
+        expect(hrefs).toContain(
+          `href="/s/${session.token}/__missing?${query.replace(/&/g, '&#x26;')}"`,
+        );
+      }
+    },
+  },
+  {
+    area: 'paths',
+    control: 'applies the guard to the explicit selection',
+    checkedIn: 'test/integration/suite/preview.test.ts (needs VS Code)',
+  },
+  {
+    area: 'scripts',
+    control: 'documents never run script, and the only script is the nonced sidebar client',
+    run: async () => {
+      const res = await request(file('hostile.md'));
+      const csp = String(res.headers['content-security-policy']);
+      const nonce = /script-src 'nonce-([^']+)'/.exec(csp)?.[1] ?? '';
+      expect(res.body.match(/<script\b[^>]*>/g)).toEqual([
+        `<script nonce="${nonce}" src="/__assets/sidebar.js">`,
+      ]);
+      expect(res.body).not.toMatch(/onerror=|javascript:/i);
+      // Remote images are not loaded (no network requests).
+      expect(res.body).not.toContain('src="https://img.shields.io');
+      expect(res.body).toContain('bd-remote-image');
+    },
+  },
+  {
+    area: 'logs',
+    control: 'never logs file contents, paths or tokens',
+    run: async () => {
+      await request(file('a.md'));
+      await request(file('%2e%2e/.agent/notes.md'));
+      const joined = logs.join('\n');
+      expect(joined).not.toContain(session.token);
+      expect(joined).not.toContain('a.md');
+      expect(joined).not.toContain('notes.md');
+      expect(logs.some((line) => line.startsWith('Preview server started'))).toBe(true);
+    },
+  },
+];
+
+describe('security controls', () => {
+  for (const row of rows) {
+    const name = `${row.area}: ${row.control}`;
+    if (row.run === undefined) {
+      it.todo(`${name} (checked in ${row.checkedIn ?? '?'})`);
+    } else {
+      it(name, row.run);
+    }
+  }
+});
