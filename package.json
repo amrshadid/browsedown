@@ -2,11 +2,19 @@
   "name": "browsedown",
   "displayName": "Browsedown",
   "description": "Open a Markdown folder or file from VS Code and read it in your browser with GitHub-style rendering and working navigation.",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "publisher": "browsedown",
   "license": "MIT",
   "preview": true,
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/amrshadid/browsedown.git"
+  },
+  "bugs": {
+    "url": "https://github.com/amrshadid/browsedown/issues"
+  },
+  "homepage": "https://github.com/amrshadid/browsedown#readme",
   "keywords": [
     "markdown",
     "preview",
