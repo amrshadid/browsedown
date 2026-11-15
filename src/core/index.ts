@@ -4,3 +4,11 @@ export {
   UNSUPPORTED_ENVIRONMENT_MESSAGE,
   type HostEnvironment,
 } from './environment';
+export {
+  checkDecodedPath,
+  checkScopedPath,
+  type PathFlavor,
+  type ScopeCheck,
+  type ScopedPath,
+  type ScopeRejection,
+} from './scope';
