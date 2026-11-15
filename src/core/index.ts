@@ -12,3 +12,32 @@ export {
   type ScopedPath,
   type ScopeRejection,
 } from './scope';
+export {
+  markTree,
+  renderIndexBody,
+  renderMissingBody,
+  renderPage,
+  renderTreeList,
+  type OutlineEntry,
+  type PageOptions,
+} from './pages';
+export { resolveLink, type LinkTarget } from './links';
+export {
+  entryUrl,
+  fileUrl,
+  indexUrl,
+  missingUrl,
+  parseRoute,
+  type AssetName,
+  type MissingReason,
+  type Route,
+} from './routes';
+export {
+  applyDiscovery,
+  findRootReadme,
+  SessionStore,
+  type Discovery,
+  type DiscoveryResult,
+  type Session,
+} from './sessions';
+export { ancestorFolders, buildTree, type TreeFile, type TreeFolder, type TreeNode } from './tree';
