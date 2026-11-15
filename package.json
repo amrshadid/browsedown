@@ -1,0 +1,111 @@
+{
+  "name": "browsedown",
+  "displayName": "Browsedown",
+  "description": "Open a Markdown folder or file from VS Code and read it in your browser with GitHub-style rendering and working navigation.",
+  "version": "0.0.0",
+  "publisher": "browsedown",
+  "license": "MIT",
+  "preview": true,
+  "private": true,
+  "keywords": [
+    "markdown",
+    "preview",
+    "browser",
+    "docs",
+    "reader",
+    "github"
+  ],
+  "categories": [
+    "Other"
+  ],
+  "engines": {
+    "vscode": "^1.100.0",
+    "node": ">=22"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "In untrusted workspaces, git is not run. Folder previews list files by walking the folder and applying only the .gitignore files inside it."
+    },
+    "virtualWorkspaces": false
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "browsedown.openInBrowser",
+        "title": "Open in Browser",
+        "category": "Browsedown"
+      },
+      {
+        "command": "browsedown.stopAll",
+        "title": "Stop All Previews",
+        "category": "Browsedown"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "browsedown.openInBrowser",
+          "when": "(explorerResourceIsFolder || resourceExtname =~ /^\\.(md|markdown|ya?ml)$/i) && !isWeb && !remoteName",
+          "group": "navigation@90"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "browsedown.openInBrowser",
+          "when": "false"
+        },
+        {
+          "command": "browsedown.stopAll",
+          "when": "!isWeb && !remoteName"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "build:prod": "node esbuild.mjs --production",
+    "watch": "node esbuild.mjs --watch",
+    "compile-tests": "tsc -p test/integration/tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p src/client/tsconfig.json --noEmit && tsc -p test/integration/tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:integration": "npm run build && npm run compile-tests && vscode-test --label main",
+    "check": "npm run lint && npm run format:check && npm run typecheck && npm run test",
+    "package": "vsce package --no-dependencies",
+    "vscode:prepublish": "npm run build:prod"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/mocha": "10.0.10",
+    "@types/node": "22.20.5",
+    "@types/vscode": "1.100.0",
+    "@vitest/coverage-v8": "5.1.0",
+    "@vscode/test-cli": "0.0.15",
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "4.1.1",
+    "esbuild": "0.28.2",
+    "eslint": "10.15.0",
+    "eslint-config-prettier": "10.1.8",
+    "ovsx": "1.4.0",
+    "prettier": "3.10.1",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.2",
+    "vitest": "5.1.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  },
+  "overrides": {
+    "minimatch": "11.0.8",
+    "glob": "14.0.6",
+    "diff": "8.0.4",
+    "serialize-javascript": "7.1.4"
+  }
+}

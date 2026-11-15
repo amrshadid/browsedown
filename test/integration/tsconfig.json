@@ -1,0 +1,13 @@
+{
+  // Compiled by tsc to CommonJS and loaded by mocha inside VS Code.
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "types": ["node", "mocha"],
+    "rootDir": "../..",
+    "outDir": "../../out"
+  },
+  "include": ["./**/*.ts", "../support/**/*.ts"],
+  "exclude": []
+}

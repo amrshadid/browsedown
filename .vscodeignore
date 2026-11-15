@@ -1,0 +1,9 @@
+# Ship only the bundle, its assets, the manifest, and user-facing docs.
+**
+!dist/extension.js
+!dist/assets/**
+!package.json
+!README.md
+!CHANGELOG.md
+!LICENSE
+!media/icon.png
