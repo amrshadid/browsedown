@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img">
+  <title>Browsedown</title>
+  <style>
+    .sheet { fill: #f5f4ef; }
+    .ink { fill: #151515; }
+    .hatch, .edge { stroke: #151515; }
+    .section { stroke: #c8201a; }
+    @media (prefers-color-scheme: dark) {
+      .sheet { fill: #1c1c1a; }
+      .ink { fill: #eceae3; }
+      .hatch, .edge { stroke: #eceae3; }
+      .section { stroke: #ff6a5c; }
+    }
+  </style>
+  <defs>
+    <path id="g" fill-rule="evenodd" d="M7 4.5H18.5L22 8V11.2L18.4 14.6V17.4L24.5 21.2V23L21 26.5H7Z M11.6 8.4V13H17.6V8.4Z M11.6 18.6V22.8H20.4L21 22.2V21.4L17.2 18.6Z" />
+    <pattern id="hatching" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line class="hatch" x1="0" y1="0" x2="0" y2="3" stroke-width="1" />
+    </pattern>
+    <clipPath id="above"><rect width="32" height="16" /></clipPath>
+    <clipPath id="below"><rect y="16" width="32" height="16" /></clipPath>
+  </defs>
+  <rect class="sheet" width="32" height="32" />
+  <use href="#g" class="ink" clip-path="url(#above)" />
+  <use href="#g" fill="url(#hatching)" clip-path="url(#below)" />
+  <use href="#g" class="edge" fill="none" stroke-width="1" clip-path="url(#below)" />
+  <line class="section" x1="1.5" y1="16" x2="30.5" y2="16" stroke-width="1.6" stroke-dasharray="5 1.5 1.5 1.5" />
+</svg>

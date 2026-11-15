@@ -18,6 +18,11 @@
   "categories": [
     "Other"
   ],
+  "icon": "media/icon.png",
+  "galleryBanner": {
+    "color": "#f5f4ef",
+    "theme": "light"
+  },
   "engines": {
     "vscode": "^1.100.0",
     "node": ">=22"
