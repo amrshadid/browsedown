@@ -31,7 +31,8 @@ jobs:
           fi
 
       # The release body is this version's CHANGELOG section, so the notes say what
-      # changed for readers. Fails if the section is missing or empty.
+      # changed for readers. Fails if the section is missing or empty. Written outside
+      # the checkout, where `npm run check` (Prettier) would flag it.
       - name: Take the release notes from CHANGELOG.md
         run: |
           version="${GITHUB_REF_NAME#v}"
@@ -39,8 +40,8 @@ jobs:
             index($0, "## [" v "]") == 1 { on = 1; next }
             on && /^(## \[|\[[^]]+\]: )/ { exit }
             on { print }
-          ' CHANGELOG.md > release-notes.md
-          if ! grep -q '[^[:space:]]' release-notes.md; then
+          ' CHANGELOG.md > "${RUNNER_TEMP}/release-notes.md"
+          if ! grep -q '[^[:space:]]' "${RUNNER_TEMP}/release-notes.md"; then
             echo "::error::CHANGELOG.md has no notes for ${version}"
             exit 1
           fi
@@ -79,4 +80,4 @@ jobs:
           flags=()
           if [ -n "${PRERELEASE}" ]; then flags+=(--prerelease); fi
           gh release create "${GITHUB_REF_NAME}" ./*.vsix --title "${GITHUB_REF_NAME}" \
-            --notes-file release-notes.md "${flags[@]}"
+            --notes-file "${RUNNER_TEMP}/release-notes.md" "${flags[@]}"
