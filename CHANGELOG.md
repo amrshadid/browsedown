@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-16
+
+Second pilot pre-release.
+
 ### Added
 
 - **Mermaid diagrams.** A ` ```mermaid ` block is drawn as a diagram, in the page's light or
@@ -52,5 +56,6 @@ First pilot pre-release.
   No remote images, no network calls, no telemetry. Read-only.
 - Logs hold lifecycle events and error codes only: no paths, tokens or file contents.
 
-[Unreleased]: https://github.com/amrshadid/browsedown/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/amrshadid/browsedown/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/amrshadid/browsedown/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/amrshadid/browsedown/releases/tag/v0.1.0
