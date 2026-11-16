@@ -461,7 +461,7 @@ const rows: Row[] = [
       const res = await request(file('hostile.md'));
       const csp = String(res.headers['content-security-policy']);
       const nonce = /script-src 'nonce-([^']+)'/.exec(csp)?.[1] ?? '';
-      expect(res.body.match(/<script\b[^>]*>/g)).toEqual([
+      expect(res.body.match(/<script\b[^>]*>/gi)).toEqual([
         `<script nonce="${nonce}" src="/__assets/sidebar.js">`,
       ]);
       expect(res.body).not.toMatch(/onerror=|javascript:/i);
@@ -499,7 +499,7 @@ const rows: Row[] = [
         `default-src 'none'; script-src 'nonce-${nonce ?? ''}'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'`,
       );
       expect(res.headers).toMatchObject({ ...SECURITY_HEADERS, 'x-frame-options': 'SAMEORIGIN' });
-      expect(res.body.match(/<script\b[^>]*>/g)).toEqual([
+      expect(res.body.match(/<script\b[^>]*>/gi)).toEqual([
         `<script nonce="${nonce ?? ''}">`,
         `<script nonce="${nonce ?? ''}">`,
       ]);
@@ -536,7 +536,7 @@ const rows: Row[] = [
       // The hostile labels are text inside the code block, never tags.
       expect(body).toContain('&#x3C;img src=x onerror=alert(1)>');
       expect(body).not.toMatch(/<img src=x|<script>alert/);
-      expect(body.match(/<script\b[^>]*>/g)?.length).toBe(1); // Only the page script.
+      expect(body.match(/<script\b[^>]*>/gi)?.length).toBe(1); // Only the page script.
     },
   },
   {

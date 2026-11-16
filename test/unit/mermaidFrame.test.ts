@@ -5,7 +5,7 @@ import { renderMermaidFrame } from '../../src/core';
 describe('renderMermaidFrame', () => {
   it('inlines the library and then the renderer, both with the nonce', () => {
     const html = renderMermaidFrame('abc+/=', 'var mermaid = {};', 'start();');
-    expect(html.match(/<script\b[^>]*>/g)).toEqual([
+    expect(html.match(/<script\b[^>]*>/gi)).toEqual([
       '<script nonce="abc+/=">',
       '<script nonce="abc+/=">',
     ]);

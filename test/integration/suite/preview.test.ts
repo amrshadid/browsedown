@@ -163,7 +163,7 @@ suite('previews over HTTP', () => {
     // The real Mermaid build and our renderer script, both inlined.
     assert.ok(frame.body.includes('globalThis["mermaid"]'));
     assert.ok(frame.body.includes('bd-diagram-'));
-    assert.equal(frame.body.match(/<script\b[^>]*>/g)?.length, 2);
+    assert.equal(frame.body.match(/<script\b[^>]*>/gi)?.length, 2);
   });
 
   test('Stop All Previews closes the server', async () => {

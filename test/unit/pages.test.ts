@@ -55,7 +55,7 @@ describe('renderPage', () => {
   const html = renderPage(base);
 
   it('loads only the nonced sidebar script, and no inline script or style', () => {
-    const scripts = html.match(/<script\b[^>]*>/g) ?? [];
+    const scripts = html.match(/<script\b[^>]*>/gi) ?? [];
     expect(scripts).toEqual(['<script nonce="abc123_-" src="/__assets/sidebar.js">']);
     expect(html).not.toMatch(/<style\b/i);
     expect(html).not.toMatch(/\sstyle=/i);
