@@ -10,7 +10,8 @@
  * 5. Files: both halves of the scope guard, then a file-type allowlist.
  *
  * Every response carries the security headers; pages get a fresh CSP nonce and
- * raw images a `sandbox` CSP. Never CORS. Logs hold lifecycle events and error
+ * raw images a `sandbox` CSP. A page with a Mermaid diagram may also frame the
+ * sandboxed renderer at `/__mermaid`, which gets its own CSP (ADR 0007). Never CORS. Logs hold lifecycle events and error
  * codes only: no paths, tokens or file contents.
  */
 import { randomBytes, timingSafeEqual } from 'node:crypto';
@@ -24,9 +25,11 @@ import {
   fileUrl,
   findRootReadme,
   indexUrl,
+  MERMAID_FRAME_PATH,
   missingUrl,
   parseRoute,
   renderIndexBody,
+  renderMermaidFrame,
   renderMissingBody,
   renderPage,
   resolveLink,
@@ -86,8 +89,11 @@ const CSP_NONE = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; f
 /** For raw images: an SVG opened directly can't run script. */
 const CSP_IMAGE = "default-src 'none'; style-src 'unsafe-inline'; sandbox";
 
-/** For pages: only our nonced script; styles, images and fonts from this origin. */
-function pageCsp(nonce: string): string {
+/**
+ * For pages: only our nonced script; styles, images and fonts from this origin.
+ * A page with a diagram may also frame this origin, for the renderer.
+ */
+export function pageCsp(nonce: string, withDiagrams = false): string {
   return [
     "default-src 'none'",
     `script-src 'nonce-${nonce}'`,
@@ -95,11 +101,35 @@ function pageCsp(nonce: string): string {
     "img-src 'self' data:",
     "font-src 'self'",
     "connect-src 'self'",
+    ...(withDiagrams ? ["frame-src 'self'"] : []),
     "base-uri 'none'",
     "form-action 'none'",
     "frame-ancestors 'none'",
   ].join('; ');
 }
+
+/**
+ * For the Mermaid renderer frame. It runs sandboxed (opaque origin) and may run
+ * only its two nonced scripts. Mermaid styles its SVG with inline styles, so they
+ * are allowed here, never in the page. Nothing may load or connect, and only this
+ * origin may frame it.
+ */
+export function mermaidFrameCsp(nonce: string): string {
+  return [
+    "default-src 'none'",
+    `script-src 'nonce-${nonce}'`,
+    "style-src 'unsafe-inline'",
+    'img-src data:',
+    "connect-src 'none'",
+    "base-uri 'none'",
+    "form-action 'none'",
+    "frame-ancestors 'self'",
+  ].join('; ');
+}
+
+/** The two scripts of the renderer frame, in `dist/assets/` (built, never served on their own). */
+const MERMAID_LIBRARY = 'mermaid.js';
+const MERMAID_RENDERER = 'mermaid-frame.js';
 
 /** Constant-time token comparison. Different lengths never match. */
 export function tokensEqual(a: string, b: string): boolean {
@@ -148,6 +178,8 @@ export class PreviewServer {
   private server: http.Server | undefined;
   private starting: Promise<number> | undefined;
   private port = 0;
+  /** The renderer scripts (5.5 MB), read from disk once, on the first diagram. */
+  private mermaidScripts: Promise<readonly [string, string]> | undefined;
 
   constructor(private readonly deps: ServerDeps) {}
 
@@ -244,6 +276,8 @@ export class PreviewServer {
         return NOT_FOUND;
       case 'favicon':
         return { status: 204, type: 'text/plain', body: '', csp: CSP_NONE };
+      case 'mermaid-frame':
+        return this.mermaidFrame();
       case 'asset':
         return {
           status: 200,
@@ -278,6 +312,29 @@ export class PreviewServer {
       case 'file':
         return this.file(session, route.encodedPath);
     }
+  }
+
+  /** `/__mermaid`: the sandboxed renderer frame, with its own CSP and framable by this origin only. */
+  private async mermaidFrame(): Promise<Reply> {
+    this.mermaidScripts ??= Promise.all([
+      readFile(path.join(this.deps.assetsDir, MERMAID_LIBRARY), 'utf8'),
+      readFile(path.join(this.deps.assetsDir, MERMAID_RENDERER), 'utf8'),
+    ]);
+    const scripts = this.mermaidScripts;
+    const [library, renderer] = await scripts.catch((error: unknown) => {
+      if (this.mermaidScripts === scripts) {
+        this.mermaidScripts = undefined; // Let the next page try again.
+      }
+      throw error;
+    });
+    const nonce = randomBytes(16).toString('base64');
+    return {
+      status: 200,
+      type: 'text/html; charset=utf-8',
+      body: renderMermaidFrame(nonce, library, renderer),
+      csp: mermaidFrameCsp(nonce),
+      headers: { 'X-Frame-Options': 'SAMEORIGIN' },
+    };
   }
 
   /** `/s/<token>/`: the README or the index. Reloading it rebuilds a folder's tree. */
@@ -331,6 +388,7 @@ export class PreviewServer {
       currentPath: relPath,
       bodyHtml: rendered.html,
       headings: rendered.headings,
+      ...(rendered.hasMermaid ? { diagramFrame: MERMAID_FRAME_PATH } : {}),
     });
   }
 
@@ -372,7 +430,7 @@ export class PreviewServer {
   private page(
     session: Session,
     content: Pick<PageOptions, 'currentPath' | 'bodyHtml' | 'headings'> &
-      Partial<Pick<PageOptions, 'title' | 'label'>>,
+      Partial<Pick<PageOptions, 'title' | 'label' | 'diagramFrame'>>,
   ): Reply {
     const nonce = randomBytes(16).toString('base64');
     const html = renderPage({
@@ -385,6 +443,11 @@ export class PreviewServer {
       nonce,
       stateKey: `browsedown:${session.token.slice(0, 12)}`,
     });
-    return { status: 200, type: 'text/html; charset=utf-8', body: html, csp: pageCsp(nonce) };
+    return {
+      status: 200,
+      type: 'text/html; charset=utf-8',
+      body: html,
+      csp: pageCsp(nonce, content.diagramFrame !== undefined),
+    };
   }
 }

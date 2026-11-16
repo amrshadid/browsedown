@@ -16,6 +16,7 @@ src/
 │   ├── tree.ts           Paths → sidebar tree
 │   ├── ignoreWalk.ts     .gitignore rules inside an opened ignored folder
 │   ├── pages.ts          HTML page templates (layout, index, dead-link page)
+│   ├── mermaidFrame.ts   The sandboxed diagram renderer's document
 │   └── html.ts           Escaping for the templates
 ├── render/
 │   ├── markdown.ts       Markdown → sanitized HTML (unified pipeline)
@@ -29,6 +30,8 @@ src/
 │   └── command.ts        The Explorer command: selection → session → URL
 ├── client/
 │   ├── sidebar.ts        Tiny browser script: panels, theme, outline highlight
+│   ├── diagrams.ts       Hands Mermaid diagrams to the renderer, shows them as images
+│   ├── mermaidFrame.ts   Runs inside the sandboxed renderer frame
 │   └── page.css          The page chrome, in GitHub's light and dark colours
 └── extension.ts          Composition root: wiring and commands
 ```
@@ -55,12 +58,31 @@ The pipeline is unified (remark and rehype) in a fixed order:
 
 ```
 parse → GFM → alerts → to HTML (keep raw HTML) → parse raw HTML
-      → sanitize → heading ids → highlight → rewrite links → stringify
+      → sanitize → heading ids → mark diagrams → highlight → rewrite links → stringify
 ```
 
 Sanitizing comes **before** heading ids, highlighting and link rewriting, so the trusted
 markup they add isn't stripped, and everything the document itself contains is checked. A
 golden test pins the exact output for an adversarial sample document.
+
+### Diagrams
+
+Mermaid is a large script that runs on text the document controls, so it never runs in
+the page:
+
+```
+page (strict CSP + frame-src 'self') ── postMessage(source, theme) ──► /__mermaid
+   ▲                                                        sandboxed iframe, opaque origin,
+   └──── SVG, shown only as <img src="data:…"> ◄─────────── its own CSP: no network
+```
+
+- The renderer marks each ` ```mermaid ` block as `<figure class="bd-mermaid">` and keeps the
+  source as code, which is what shows without JavaScript or when drawing fails.
+- Only a page with a diagram may frame `/__mermaid`. That route holds only library code, so it
+  has no session token. It inlines Mermaid's browser build and `client/mermaidFrame.ts` with a
+  nonce: an opaque origin couldn't load them by URL.
+- The page checks the shape of every answer and shows the SVG as an image, which can't run
+  script or load anything. The SVG never enters the page's DOM.
 
 ## Discovery
 

@@ -1,6 +1,8 @@
 /**
  * The server's URL space. Everything a session serves lives under `/s/<token>/`;
- * the bundled assets are public and shared under `/__assets/`.
+ * the bundled assets are public and shared under `/__assets/`, and so is the
+ * Mermaid renderer frame at `/__mermaid`: it holds only library code, so it needs
+ * no token, and a compromised frame never learns one (ADR 0007).
  *
  * Request targets are parsed from the **raw** string, never through `new URL()`:
  * the WHATWG URL parser treats `%2e%2e` as `..` and resolves dot segments, which
@@ -15,12 +17,16 @@ const TOKEN = /^[A-Za-z0-9_-]{43}$/;
 const ASSET_NAMES = ['github-markdown.css', 'highlight.css', 'page.css', 'sidebar.js'] as const;
 export type AssetName = (typeof ASSET_NAMES)[number];
 
+/** The sandboxed frame that draws Mermaid diagrams for a page. */
+export const MERMAID_FRAME_PATH = '/__mermaid';
+
 /** Why a link leads to the explanation page instead of a file. */
 export type MissingReason = 'outside' | 'missing';
 
 export type Route =
   | { readonly kind: 'asset'; readonly name: AssetName }
   | { readonly kind: 'favicon' }
+  | { readonly kind: 'mermaid-frame' }
   | { readonly kind: 'entry'; readonly token: string }
   | { readonly kind: 'index'; readonly token: string }
   | { readonly kind: 'file'; readonly token: string; readonly encodedPath: string }
@@ -48,6 +54,9 @@ export function parseRoute(target: string): Route {
 
   if (path === '/favicon.ico') {
     return { kind: 'favicon' };
+  }
+  if (path === MERMAID_FRAME_PATH) {
+    return { kind: 'mermaid-frame' };
   }
   if (path.startsWith('/__assets/')) {
     const name = path.slice('/__assets/'.length);

@@ -1,0 +1,13 @@
+<h1 id="diagrams">Diagrams</h1>
+<figure class="bd-mermaid"><pre><code class="language-mermaid">flowchart LR
+  A[Reader] -->|right-click| B(Browsedown)
+</code></pre></figure>
+<p>A hostile diagram: its text must reach the page only as escaped code.</p>
+<figure class="bd-mermaid"><pre><code class="language-mermaid">flowchart TD
+  X["&#x3C;img src=x onerror=alert(1)>"] --> Y["&#x3C;script>alert(2)&#x3C;/script>"]
+  click X href "javascript:alert(3)"
+</code></pre></figure>
+<figure class="bd-mermaid"><pre><code class="language-mermaid">graph TD; Raw --> HTML</code></pre></figure>
+<p>A document can't fake the wrapper.</p>
+<pre><code class="hljs language-js"><span class="hljs-keyword">const</span> stillHighlighted = <span class="hljs-literal">true</span>;
+</code></pre>

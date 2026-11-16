@@ -210,3 +210,17 @@ describe('the tree markup', () => {
     expect(big.length / paths.length).toBeLessThan(180);
   });
 });
+
+describe('renderPage with diagrams', () => {
+  it('points the page script at the renderer only when the document has a diagram', () => {
+    expect(renderPage(base)).not.toContain('data-bd-diagrams');
+    expect(renderPage({ ...base, diagramFrame: '/__mermaid' })).toContain(
+      '<html lang="en" data-bd-state="mt:T" data-bd-has-tree data-bd-has-outline data-bd-diagrams="/__mermaid">',
+    );
+  });
+
+  it('escapes the renderer URL', () => {
+    const html = renderPage({ ...base, diagramFrame: '/x"><script>' });
+    expect(html).toContain('data-bd-diagrams="/x&quot;&gt;&lt;script&gt;"');
+  });
+});

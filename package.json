@@ -121,6 +121,7 @@
     "github-markdown-css": "5.9.0",
     "ignore": "7.0.14",
     "lowlight": "3.3.0",
+    "mermaid": "12.3.0",
     "rehype-highlight": "7.0.2",
     "rehype-raw": "7.0.0",
     "rehype-sanitize": "6.0.0",

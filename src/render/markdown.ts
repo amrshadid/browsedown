@@ -7,8 +7,9 @@
  *    sanitizer and the link rewriter can see every `<a>` and `<img>`.
  * 3. Sanitize before anything adds trusted markup: scripts, event handlers and
  *    `javascript:` URLs are removed from the document.
- * 4. Then add heading ids (github-slugger: duplicates get `-1`, `-2`, as on GitHub)
- *    and highlighting classes, which the sanitizer would otherwise strip.
+ * 4. Then add heading ids (github-slugger: duplicates get `-1`, `-2`, as on GitHub),
+ *    mark Mermaid diagrams, and add highlighting classes, which the sanitizer would
+ *    otherwise strip.
  * 5. Rewrite local URLs last, on the sanitized tree.
  *
  * https://github.com/rehypejs/rehype-sanitize#example-headings-dom-clobbering
@@ -48,6 +49,11 @@ export interface RenderResult {
   /** Sanitized HTML for the inside of `<article class="markdown-body">`. */
   readonly html: string;
   readonly headings: readonly Heading[];
+  /**
+   * True when the document has a Mermaid diagram. Only then does the page start
+   * the sandboxed diagram renderer (ADR 0007).
+   */
+  readonly hasMermaid: boolean;
 }
 
 /**
@@ -81,6 +87,7 @@ const STATE_KEY = 'browsedown';
 interface RenderState {
   readonly ctx: RenderContext;
   readonly headings: Heading[];
+  hasMermaid: boolean;
 }
 
 function isRenderState(value: unknown): value is RenderState {
@@ -93,13 +100,51 @@ function isRenderState(value: unknown): value is RenderState {
   );
 }
 
+function stateOf(file: { data: Record<string, unknown> }): RenderState {
+  const state = file.data[STATE_KEY];
+  if (!isRenderState(state)) {
+    throw new Error('render(): missing render state');
+  }
+  return state;
+}
+
+/**
+ * Wraps each Mermaid code block, a fence or raw `<pre><code class="language-mermaid">`,
+ * in `<figure class="bd-mermaid">`. The source stays as plain code: without
+ * JavaScript, or if drawing fails, the reader still sees it. The page script hands
+ * the source to the sandboxed renderer and shows the result as an image.
+ * Runs after the sanitizer, so the figure is ours, not the document's.
+ */
+function rehypeMermaid() {
+  return (tree: Root, file: { data: Record<string, unknown> }): void => {
+    const state = stateOf(file);
+    visit(tree, 'element', (node: Element, index, parent) => {
+      if (node.tagName !== 'pre' || parent === undefined || index === undefined) {
+        return;
+      }
+      const code = node.children.find(
+        (child): child is Element => child.type === 'element' && child.tagName === 'code',
+      );
+      const classes = code?.properties.className;
+      if (!Array.isArray(classes) || !classes.includes('language-mermaid')) {
+        return;
+      }
+      state.hasMermaid = true;
+      parent.children[index] = {
+        type: 'element',
+        tagName: 'figure',
+        properties: { className: ['bd-mermaid'] },
+        children: [node],
+      };
+      return 'skip';
+    });
+  };
+}
+
 /** Rewrites local `href`/`src`, blocks remote images, and collects headings. */
 function rehypeLinksAndHeadings() {
   return (tree: Root, file: { data: Record<string, unknown> }): void => {
-    const state = file.data[STATE_KEY];
-    if (!isRenderState(state)) {
-      throw new Error('render(): missing render state');
-    }
+    const state = stateOf(file);
     visit(tree, 'element', (node: Element) => {
       const depth = headingDepth(node.tagName);
       if (depth !== undefined && typeof node.properties.id === 'string') {
@@ -176,7 +221,9 @@ const processor = unified()
   .use(rehypeRaw)
   .use(rehypeSanitize, schema)
   .use(rehypeSlug)
-  .use(rehypeHighlight, { detect: false })
+  .use(rehypeMermaid)
+  // Mermaid source is shown as is: highlighting would only add noise to it.
+  .use(rehypeHighlight, { detect: false, plainText: ['mermaid'] })
   .use(rehypeLinksAndHeadings)
   .use(rehypeStringify)
   .freeze();
@@ -186,7 +233,7 @@ const processor = unified()
  * the same result, and nothing is read from disk or the network.
  */
 export function render(source: string, ctx: RenderContext): RenderResult {
-  const state: RenderState = { ctx, headings: [] };
+  const state: RenderState = { ctx, headings: [], hasMermaid: false };
   const file = processor.processSync({ value: source, data: { [STATE_KEY]: state } });
-  return { html: String(file), headings: state.headings };
+  return { html: String(file), headings: state.headings, hasMermaid: state.hasMermaid };
 }
