@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { entryUrl, fileUrl, indexUrl, missingUrl, parseRoute } from '../../src/core';
+import {
+  entryUrl,
+  fileUrl,
+  indexUrl,
+  MERMAID_FRAME_PATH,
+  missingUrl,
+  parseRoute,
+} from '../../src/core';
 
 const T = 'A'.repeat(43);
 
@@ -15,8 +22,22 @@ describe('parseRoute', () => {
     [`/s/${T}/f/a.md?x=1`, { kind: 'file', token: T, encodedPath: 'a.md' }],
     ['/__assets/page.css', { kind: 'asset', name: 'page.css' }],
     ['/favicon.ico', { kind: 'favicon' }],
+    ['/__mermaid', { kind: 'mermaid-frame' }],
+    ['/__mermaid?x=1', { kind: 'mermaid-frame' }],
   ])('%s', (target, route) => {
     expect(parseRoute(target)).toEqual(route);
+  });
+
+  // The renderer frame is token-free and lives at exactly one path (ADR 0007).
+  it.each(['/__mermaid/', '/__mermaidx', `/s/${T}/__mermaid`, '/__assets/mermaid.js'])(
+    'does not serve the renderer at %s',
+    (target) => {
+      expect(parseRoute(target)).toEqual({ kind: 'not-found' });
+    },
+  );
+
+  it('names the renderer path once', () => {
+    expect(parseRoute(MERMAID_FRAME_PATH)).toEqual({ kind: 'mermaid-frame' });
   });
 
   it('keeps encoded traversal as sent, for the scope guard to reject', () => {

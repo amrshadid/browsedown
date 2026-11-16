@@ -59,6 +59,9 @@ Made for reading:
   section you're reading.
 - **Light and dark**: pages follow your system, or pick Light or Dark with the theme button.
   These are GitHub's own themes.
+- **Mermaid diagrams**: a ` ```mermaid ` block is drawn as a diagram, in the page's light or
+  dark theme. **Preview** and **Code** switch between the diagram and its source, and the
+  code stays visible while the diagram is drawn or if it can't be.
 - On narrow windows both panels float over the page, and Esc closes them.
 
 A link to something that's missing, or outside what you opened, leads to a page that says
@@ -103,7 +106,9 @@ So security is part of the design:
   `../` tricks and Windows path quirks included) and once on disk (symlinks out of the
   folder are refused).
 - Scripts in documents never run. HTML is sanitized, and a strict Content Security Policy
-  allows only the extension's own small sidebar script.
+  allows only the extension's own small page script.
+- Mermaid diagrams are drawn in a sandboxed frame that can't reach the page, your files or
+  the network. The page shows what it draws only as images.
 - Read-only, with no network calls, no remote images, no telemetry and no CORS.
 
 See [SECURITY.md](SECURITY.md) for the threat model and how to report a problem.
@@ -124,14 +129,16 @@ More in [docs/design-principles.md](docs/design-principles.md).
 
 ## Limitations
 
-These are deliberate choices for the first release:
+These are deliberate choices for now:
 
 - **Local desktop windows only.** Remote, WSL, Codespaces and VS Code for the Web aren't
   supported yet: they tunnel the local server through a different address, which the
   security checks refuse.
 - **Remote images are not loaded**, including badges. They show their alt text instead, to
   keep the no-network promise.
-- **GitHub Flavored Markdown only.** No Mermaid, math or MDX.
+- **GitHub Flavored Markdown and Mermaid only.** No math or MDX.
+- **Diagrams are images.** Text inside a diagram can't be selected or found with the
+  browser's find, and Mermaid `click` links don't work. **Code** shows the source.
 - **No live reload.** Reload the page to see edits.
 - An ignored folder you open inherits no rules from outside it: only the `.gitignore` files
   inside it apply.

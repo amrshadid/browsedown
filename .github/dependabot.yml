@@ -19,6 +19,11 @@ updates:
           - 'highlight.js'
           - 'github-markdown-css'
           - '@types/hast'
+      # The diagram renderer (docs/architecture.md). Its updates are
+      # checked in a browser with hostile diagrams before merging.
+      mermaid:
+        patterns:
+          - 'mermaid'
       dev-dependencies:
         dependency-type: development
     ignore:

@@ -43,6 +43,11 @@ export interface PageOptions {
   readonly label?: string;
   /** Shown instead of the file name, for generated pages (the index, a dead link). */
   readonly title?: string;
+  /**
+   * URL of the Mermaid renderer frame, set only when the document has a diagram.
+   * The page script then starts the renderer (ADR 0007).
+   */
+  readonly diagramFrame?: string;
 }
 
 /** Characters a CSP nonce may contain (base64 and base64url). */
@@ -61,13 +66,17 @@ export function renderPage(options: PageOptions): string {
   const hasTree = options.treeHtml !== undefined && options.treeHtml !== '';
   const hasOutline = outline.length > 0;
   const asset = (name: string): string => escapeHtml(`${options.assetBase}/${name}`);
+  const diagrams =
+    options.diagramFrame === undefined
+      ? ''
+      : ` data-bd-diagrams="${escapeHtml(options.diagramFrame)}"`;
   const label =
     options.label === undefined
       ? ''
       : ` <span class="bd-label">${escapeHtml(options.label)}</span>`;
 
   return `<!doctype html>
-<html lang="en" data-bd-state="${escapeHtml(options.stateKey)}"${hasTree ? ' data-bd-has-tree' : ''}${hasOutline ? ' data-bd-has-outline' : ''}>
+<html lang="en" data-bd-state="${escapeHtml(options.stateKey)}"${hasTree ? ' data-bd-has-tree' : ''}${hasOutline ? ' data-bd-has-outline' : ''}${diagrams}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">

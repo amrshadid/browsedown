@@ -5,9 +5,12 @@
 //   so it never defines globals).
 // - `dist/assets/*.css`: GitHub's Markdown styles, the highlight.js themes, and the
 //   page chrome (`src/client/page.css`).
+// - `dist/assets/mermaid.js` and `mermaid-frame.js`: Mermaid's browser build and our
+//   renderer script, inlined by the server into the sandboxed frame (ADR 0007).
 //
-// A production build fails if the extension bundle exceeds its size budget.
+// A production build fails if the extension bundle or Mermaid exceeds its size budget.
 import * as esbuild from 'esbuild';
+import { Buffer } from 'node:buffer';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -17,6 +20,9 @@ const watch = process.argv.includes('--watch');
 
 /** The minified extension bundle must stay at or below 700 KB: activation stays fast. */
 const EXTENSION_BUDGET_BYTES = 700 * 1024;
+
+/** Mermaid loads only on pages with a diagram, from local disk, but the VSIX carries it. */
+const MERMAID_BUDGET_BYTES = 6 * 1024 * 1024;
 
 const require = createRequire(import.meta.url);
 const assetsDir = 'dist/assets';
@@ -47,6 +53,30 @@ const client = {
   minify: production,
   logLevel: 'info',
 };
+
+/** @type {import('esbuild').BuildOptions} */
+const mermaidFrame = {
+  ...client,
+  entryPoints: ['src/client/mermaidFrame.ts'],
+  outfile: `${assetsDir}/mermaid-frame.js`,
+};
+
+/**
+ * Copies Mermaid's browser build (an IIFE that defines the `mermaid` global). The
+ * server inlines it into a `<script>`, so it must not contain `<script` or
+ * `</script`; the source map comment points at a file we don't ship.
+ */
+async function copyMermaid() {
+  const source = await readFile(require.resolve('mermaid/dist/mermaid.min.js'), 'utf8');
+  const script = source.replace(/\n?\/\/# sourceMappingURL=\S*\s*$/, '\n');
+  if (/<\/?script/i.test(script)) {
+    throw new Error('mermaid.min.js contains a script tag; it cannot be inlined.');
+  }
+  if (production && Buffer.byteLength(script) > MERMAID_BUDGET_BYTES) {
+    throw new Error(`mermaid.min.js is over the ${MERMAID_BUDGET_BYTES / 1024 / 1024} MB budget.`);
+  }
+  await writeFile(path.join(assetsDir, 'mermaid.js'), script);
+}
 
 /** Applies to the page when the reader picked no theme: follow the system. */
 const SYSTEM = 'html:not([data-bd-theme])';
@@ -140,11 +170,14 @@ async function checkBudget() {
 }
 
 await copyCss();
+await copyMermaid();
 if (watch) {
-  const contexts = await Promise.all([esbuild.context(extension), esbuild.context(client)]);
+  const contexts = await Promise.all(
+    [extension, client, mermaidFrame].map((options) => esbuild.context(options)),
+  );
   await Promise.all(contexts.map((ctx) => ctx.watch()));
 } else {
-  await Promise.all([esbuild.build(extension), esbuild.build(client)]);
+  await Promise.all([extension, client, mermaidFrame].map((options) => esbuild.build(options)));
   if (production) {
     await checkBudget();
   }

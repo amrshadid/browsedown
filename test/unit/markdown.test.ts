@@ -152,3 +152,39 @@ describe('render', () => {
     expect(second.headings).toHaveLength(1);
   });
 });
+
+describe('Mermaid diagrams', () => {
+  // Pins the diagram markup the page script and the server's CSP depend on (ADR 0007).
+  it('matches the golden HTML for the Mermaid sample', () => {
+    const { html, hasMermaid } = render(read('mermaid-sample.md'), fixedContext);
+    expect(html).toBe(read('mermaid-sample.html'));
+    expect(hasMermaid).toBe(true);
+  });
+
+  it('wraps a fence in the diagram figure, unhighlighted', () => {
+    const { html } = render('```mermaid\ngraph TD; A-->B\n```\n', fixedContext);
+    expect(html).toBe(
+      '<figure class="bd-mermaid"><pre><code class="language-mermaid">graph TD; A-->B\n</code></pre></figure>',
+    );
+  });
+
+  it('reports no diagram for documents without one', () => {
+    expect(render('# Hi\n\n```js\nx\n```\n', fixedContext).hasMermaid).toBe(false);
+    expect(render('Text about `mermaid`.\n', fixedContext).hasMermaid).toBe(false);
+  });
+
+  it('keeps diagram text as escaped code', () => {
+    const { html } = render('```mermaid\nA["<script>alert(1)</script>"]\n```\n', fixedContext);
+    expect(html).not.toContain('<script');
+    expect(html).toContain('&#x3C;script>alert(1)&#x3C;/script>');
+  });
+
+  it('never lets a document fake the diagram wrapper', () => {
+    const { html, hasMermaid } = render(
+      '<figure class="bd-mermaid"><p>x</p></figure>\n',
+      fixedContext,
+    );
+    expect(html).not.toContain('bd-mermaid');
+    expect(hasMermaid).toBe(false);
+  });
+});

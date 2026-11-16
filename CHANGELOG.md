@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Mermaid diagrams.** A ` ```mermaid ` block is drawn as a diagram, in the page's light or
+  dark theme. **Preview** and **Code** switch between the diagram and its source; the code
+  shows while the diagram is drawn, and with a short reason if it can't be. Alt text comes
+  from the diagram's `accTitle` and `accDescr`.
+
+### Security
+
+- Diagrams are drawn in a sandboxed frame with its own Content Security Policy: no network,
+  no access to the page or the session token. The page shows its output only as images, and
+  only pages with a diagram may frame it. Every other page keeps the same policy as before.
+
 ## [0.1.0] - 2026-11-15
 
 First pilot pre-release.

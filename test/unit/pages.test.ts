@@ -55,7 +55,7 @@ describe('renderPage', () => {
   const html = renderPage(base);
 
   it('loads only the nonced sidebar script, and no inline script or style', () => {
-    const scripts = html.match(/<script\b[^>]*>/g) ?? [];
+    const scripts = html.match(/<script\b[^>]*>/gi) ?? [];
     expect(scripts).toEqual(['<script nonce="abc123_-" src="/__assets/sidebar.js">']);
     expect(html).not.toMatch(/<style\b/i);
     expect(html).not.toMatch(/\sstyle=/i);
@@ -208,5 +208,19 @@ describe('the tree markup', () => {
     const big = renderTreeList(buildTree(paths), (p) => `/s/${'T'.repeat(43)}/f/${p}`);
     // Under 180 bytes a row: less than half of what inline SVG icons cost (~440).
     expect(big.length / paths.length).toBeLessThan(180);
+  });
+});
+
+describe('renderPage with diagrams', () => {
+  it('points the page script at the renderer only when the document has a diagram', () => {
+    expect(renderPage(base)).not.toContain('data-bd-diagrams');
+    expect(renderPage({ ...base, diagramFrame: '/__mermaid' })).toContain(
+      '<html lang="en" data-bd-state="mt:T" data-bd-has-tree data-bd-has-outline data-bd-diagrams="/__mermaid">',
+    );
+  });
+
+  it('escapes the renderer URL', () => {
+    const html = renderPage({ ...base, diagramFrame: '/x"><script>' });
+    expect(html).toContain('data-bd-diagrams="/x&quot;&gt;&lt;script&gt;"');
   });
 });

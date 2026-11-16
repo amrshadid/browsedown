@@ -93,8 +93,27 @@ beforeAll(async () => {
       '',
     ].join('\n'),
   );
+  writeFileSync(
+    join(docs, 'diagram.md'),
+    [
+      '# Diagram',
+      '```mermaid',
+      'flowchart TD',
+      '  X["<img src=x onerror=alert(1)>"] --> Y["<script>alert(2)</script>"]',
+      '  click X href "javascript:alert(3)"',
+      '```',
+      '',
+    ].join('\n'),
+  );
   assets = mkdtempSync(join(tmpdir(), 'browsedown-assets-'));
-  for (const name of ['github-markdown.css', 'highlight.css', 'page.css', 'sidebar.js']) {
+  for (const name of [
+    'github-markdown.css',
+    'highlight.css',
+    'page.css',
+    'sidebar.js',
+    'mermaid.js',
+    'mermaid-frame.js',
+  ]) {
     writeFileSync(join(assets, name), `/* ${name} */`);
   }
   const sessions = new SessionStore(tokensEqual);
@@ -112,7 +131,7 @@ beforeAll(async () => {
     fresh: false,
   };
   applyDiscovery(session, {
-    files: ['README.md', 'a.md', 'hostile.md'],
+    files: ['README.md', 'a.md', 'hostile.md', 'diagram.md'],
     discovery: 'git',
     truncated: false,
   });
@@ -181,7 +200,7 @@ async function expectBlockedForThisPlatform(...encodedPaths: string[]): Promise<
 }
 
 interface Row {
-  /** The area of the control: network, requests, token, headers, files, paths, scripts, logs. */
+  /** The area of the control: network, requests, token, headers, files, paths, scripts, diagrams, logs. */
   readonly area: string;
   readonly control: string;
   readonly run?: () => Promise<void>;
@@ -317,6 +336,7 @@ const rows: Row[] = [
           headers: { origin: 'http://evil.example' },
         }),
         await request('/__assets/sidebar.js'),
+        await request('/__mermaid'),
       ];
       for (const res of responses) {
         expect(Object.keys(res.headers).filter((h) => h.startsWith('access-control-'))).toEqual([]);
@@ -441,7 +461,7 @@ const rows: Row[] = [
       const res = await request(file('hostile.md'));
       const csp = String(res.headers['content-security-policy']);
       const nonce = /script-src 'nonce-([^']+)'/.exec(csp)?.[1] ?? '';
-      expect(res.body.match(/<script\b[^>]*>/g)).toEqual([
+      expect(res.body.match(/<script\b[^>]*>/gi)).toEqual([
         `<script nonce="${nonce}" src="/__assets/sidebar.js">`,
       ]);
       expect(res.body).not.toMatch(/onerror=|javascript:/i);
@@ -449,6 +469,80 @@ const rows: Row[] = [
       expect(res.body).not.toContain('src="https://img.shields.io');
       expect(res.body).toContain('bd-remote-image');
     },
+  },
+  {
+    area: 'diagrams',
+    control: 'a page may frame the renderer only when it has a diagram',
+    run: async () => {
+      const csp = async (path: string): Promise<string> =>
+        String((await request(file(path))).headers['content-security-policy']);
+      expect(await csp('diagram.md')).toContain("frame-src 'self'");
+      expect(await csp('diagram.md')).toContain("frame-ancestors 'none'");
+      for (const path of ['a.md', 'hostile.md', 'ignored.yml']) {
+        expect(await csp(path), path).not.toContain('frame-src');
+      }
+      expect((await request(file('diagram.md'))).body).toContain('data-bd-diagrams="/__mermaid"');
+      expect((await request(file('a.md'))).body).not.toContain('data-bd-diagrams');
+    },
+  },
+  {
+    area: 'diagrams',
+    control: 'the renderer frame: own CSP, no network, framable by this origin only, no token',
+    run: async () => {
+      const res = await request('/__mermaid');
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toBe('text/html; charset=utf-8');
+      const nonce = /script-src 'nonce-([^']+)'/.exec(
+        String(res.headers['content-security-policy']),
+      )?.[1];
+      expect(res.headers['content-security-policy']).toBe(
+        `default-src 'none'; script-src 'nonce-${nonce ?? ''}'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'`,
+      );
+      expect(res.headers).toMatchObject({ ...SECURITY_HEADERS, 'x-frame-options': 'SAMEORIGIN' });
+      expect(res.body.match(/<script\b[^>]*>/gi)).toEqual([
+        `<script nonce="${nonce ?? ''}">`,
+        `<script nonce="${nonce ?? ''}">`,
+      ]);
+      expect(res.body).toContain('/* mermaid.js */');
+      expect(res.body).toContain('/* mermaid-frame.js */');
+      expect(res.body).not.toContain(session.token);
+    },
+  },
+  {
+    area: 'diagrams',
+    control: 'the renderer frame passes the request checks, and its scripts are not served alone',
+    run: async () => {
+      expect(
+        (await request('/__mermaid', { headers: { origin: 'http://evil.example' } })).status,
+      ).toBe(403);
+      expect((await request('/__mermaid', { headers: { origin: 'null' } })).status).toBe(403);
+      expect((await request('/__mermaid', { host: `evil.example:${port}` })).status).toBe(421);
+      expect((await request('/__mermaid', { method: 'POST' })).status).toBe(405);
+      for (const target of [
+        '/__assets/mermaid.js',
+        '/__assets/mermaid-frame.js',
+        `/s/${session.token}/__mermaid`,
+      ]) {
+        expect((await request(target)).status, target).toBe(404);
+      }
+    },
+  },
+  {
+    area: 'diagrams',
+    control: 'diagram text reaches the page only as escaped code',
+    run: async () => {
+      const { body } = await request(file('diagram.md'));
+      expect(body).toContain('<figure class="bd-mermaid"><pre><code class="language-mermaid">');
+      // The hostile labels are text inside the code block, never tags.
+      expect(body).toContain('&#x3C;img src=x onerror=alert(1)>');
+      expect(body).not.toMatch(/<img src=x|<script>alert/);
+      expect(body.match(/<script\b[^>]*>/gi)?.length).toBe(1); // Only the page script.
+    },
+  },
+  {
+    area: 'diagrams',
+    control: 'the frame is sandboxed, and the page shows its output only as images',
+    checkedIn: 'src/client/diagrams.ts; manual browser check before every release',
   },
   {
     area: 'logs',

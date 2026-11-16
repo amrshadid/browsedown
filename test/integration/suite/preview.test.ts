@@ -1,9 +1,10 @@
 /**
  * End to end in a real VS Code: run the command's logic through the extension's
  * API, then talk to the preview server over HTTP (no browser needed). Covers every
- * row of the README's ignore table, file mode, YAML and the explicit selection.
+ * row of the README's ignore table, file mode, YAML, Mermaid and the explicit selection.
  */
 import * as assert from 'node:assert/strict';
+import { writeFileSync } from 'node:fs';
 import * as http from 'node:http';
 import * as path from 'node:path';
 
@@ -145,6 +146,24 @@ suite('previews over HTTP', () => {
     // The session's scope is the symlink target's folder, so docs/ files are outside it.
     const page = await get(`${base}/f/a.md`);
     assert.equal(page.status, 404);
+  });
+
+  test('a Mermaid diagram gets the renderer frame, built from the shipped assets', async () => {
+    writeFileSync(
+      path.join(repo.root, 'docs', 'diagram.md'),
+      '# Diagram\n\n```mermaid\nflowchart LR\n  A --> B\n```\n',
+    );
+    const entry = await api.createPreview(at('docs/diagram.md'));
+    const { page } = await treeOf(entry);
+    assert.ok(page.body.includes('data-bd-diagrams="/__mermaid"'));
+    assert.ok(page.body.includes('<figure class="bd-mermaid">'));
+
+    const frame = await get(new URL('/__mermaid', entry).href);
+    assert.equal(frame.status, 200);
+    // The real Mermaid build and our renderer script, both inlined.
+    assert.ok(frame.body.includes('globalThis["mermaid"]'));
+    assert.ok(frame.body.includes('bd-diagram-'));
+    assert.equal(frame.body.match(/<script\b[^>]*>/gi)?.length, 2);
   });
 
   test('Stop All Previews closes the server', async () => {

@@ -562,3 +562,67 @@ a.bd-row[data-depth='8'] {
   content: '⊘ ';
   margin-right: 2px;
 }
+
+/* ---------- Mermaid diagrams (ADR 0007) ---------- */
+
+/* Drawn in a sandboxed frame and shown as an image. Until then, and if drawing
+   fails, the code shows with a note; once drawn, Preview / Code switch views. */
+.markdown-body figure.bd-mermaid {
+  margin: 0 0 16px;
+}
+
+.bd-mermaid-views {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.bd-mermaid-view {
+  padding: 2px 10px;
+  color: var(--bd-fg-muted);
+  font: inherit;
+  font-size: 12px;
+  background: var(--bd-bg);
+  border: 1px solid var(--bd-border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.bd-mermaid-view:hover {
+  color: var(--bd-fg);
+  background: var(--bd-bg-hover);
+}
+
+.bd-mermaid-view[aria-pressed='true'] {
+  color: var(--bd-fg);
+  background: var(--bd-bg-selected);
+}
+
+.bd-mermaid-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+}
+
+.markdown-body figure.bd-mermaid[data-bd-view='preview'] > pre,
+.markdown-body figure.bd-mermaid[data-bd-view='code'] > .bd-mermaid-image {
+  display: none;
+}
+
+.markdown-body .bd-mermaid-status {
+  margin: 8px 0 0;
+  color: var(--bd-fg-muted);
+  font-size: 12px;
+}
+
+/* The renderer lays diagrams out off screen; it needs a real size to measure text. */
+.bd-mermaid-frame {
+  position: absolute;
+  top: 0;
+  left: -10000px;
+  width: 1000px;
+  height: 800px;
+  border: 0;
+  visibility: hidden;
+}

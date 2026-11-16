@@ -5,6 +5,7 @@
 //   preview session (sessionStorage, cleared when the tab closes).
 // - Remembers open folders and the chosen theme.
 // - Highlights the outline entry for the section being read.
+// - Starts the sandboxed Mermaid renderer on pages with diagrams (diagrams.ts).
 //
 // Documents are sanitized, but a page could still shadow `document.<name>`: an
 // `<img name="querySelectorAll">` replaces that method on the document object.
@@ -15,10 +16,20 @@
 // Loaded in <head> without `defer`, so remembered state applies before the first
 // paint; everything else waits for DOMContentLoaded.
 
+import { startDiagrams, type DiagramTheme, type Diagrams } from './diagrams';
+
 type Panel = 'tree' | 'outline';
 const PANELS: readonly Panel[] = ['tree', 'outline'];
 
 const root = document.documentElement;
+// Taken from the prototype, which page content can't shadow, unlike the document object.
+const createOnDocument: unknown = Reflect.get(Document.prototype, 'createElement');
+function createElement<K extends keyof HTMLElementTagNameMap>(tag: K): HTMLElementTagNameMap[K] {
+  if (typeof createOnDocument !== 'function') {
+    throw new TypeError('createElement is unavailable');
+  }
+  return Reflect.apply(createOnDocument, document, [tag]) as HTMLElementTagNameMap[K];
+}
 
 // Lookups go through the <html> element, captured above before any content
 // exists: unlike the document object, an ordinary element can't be shadowed by
@@ -112,6 +123,16 @@ function currentTheme(): Theme {
   return value === 'light' || value === 'dark' ? value : 'system';
 }
 
+const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
+
+/** The Mermaid theme that matches what the page shows now. */
+function diagramTheme(): DiagramTheme {
+  const theme = currentTheme();
+  return theme === 'dark' || (theme === 'system' && systemDark.matches) ? 'dark' : 'default';
+}
+
+let diagrams: Diagrams | undefined;
+
 // 1. Before first paint: restore the theme and each panel's state.
 root.setAttribute('data-bd-js', '');
 applyTheme(loadTheme());
@@ -129,6 +150,12 @@ window.addEventListener('DOMContentLoaded', () => {
     setOpen(panel, isOpen(panel), false);
   }
   applyTheme(currentTheme()); // Now the button exists: set its label.
+  diagrams = startDiagrams({ root, createElement, theme: diagramTheme });
+  systemDark.addEventListener('change', () => {
+    if (currentTheme() === 'system') {
+      diagrams?.refresh();
+    }
+  });
 
   root.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
@@ -137,6 +164,7 @@ window.addEventListener('DOMContentLoaded', () => {
     if (target?.closest('[data-bd-theme-toggle]')) {
       const next = THEMES[(THEMES.indexOf(currentTheme()) + 1) % THEMES.length] ?? 'system';
       applyTheme(next);
+      diagrams?.refresh();
       try {
         window.localStorage.setItem(THEME_KEY, next);
       } catch {

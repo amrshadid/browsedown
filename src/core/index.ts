@@ -23,10 +23,12 @@ export {
 } from './pages';
 export { IgnoreRules } from './ignoreWalk';
 export { resolveLink, type LinkTarget } from './links';
+export { renderMermaidFrame } from './mermaidFrame';
 export {
   entryUrl,
   fileUrl,
   indexUrl,
+  MERMAID_FRAME_PATH,
   missingUrl,
   parseRoute,
   type AssetName,
