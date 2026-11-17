@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-17
+
+Fourth pilot pre-release.
+
 ### Added
 
 - **Hide in Browsedown.** Right-click a folder or file in the Explorer or the Browsedown view
@@ -82,7 +86,8 @@ First pilot pre-release.
   No remote images, no network calls, no telemetry. Read-only.
 - Logs hold lifecycle events and error codes only: no paths, tokens or file contents.
 
-[Unreleased]: https://github.com/amrshadid/browsedown/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/amrshadid/browsedown/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/amrshadid/browsedown/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/amrshadid/browsedown/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/amrshadid/browsedown/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/amrshadid/browsedown/releases/tag/v0.1.0
