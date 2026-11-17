@@ -246,12 +246,13 @@ export function renderIndexBody(
 /** Body of the page a dead link leads to: it says why, instead of a bare 404. */
 export function renderMissingBody(
   ref: string,
-  reason: 'outside' | 'missing',
+  reason: 'outside' | 'missing' | 'hidden',
   scopeName: string,
 ): string {
-  const what =
-    reason === 'outside'
-      ? `It points outside <strong>${escapeHtml(scopeName)}</strong>, the folder you opened, so it isn't shown. Open a folder that contains both files to follow it.`
-      : `It points to a file that doesn't exist in <strong>${escapeHtml(scopeName)}</strong>, or that isn't one Browsedown shows.`;
+  const what = {
+    outside: `It points outside <strong>${escapeHtml(scopeName)}</strong>, the folder you opened, so it isn't shown. Open a folder that contains both files to follow it.`,
+    missing: `It points to a file that doesn't exist in <strong>${escapeHtml(scopeName)}</strong>, or that isn't one Browsedown shows.`,
+    hidden: `It points to a file you hid in Browsedown, so it isn't shown. Unhide it from the Hidden section of the Browsedown view in VS Code to read it here.`,
+  }[reason];
   return `<h1>This link isn't available</h1>\n<p><code>${escapeHtml(ref)}</code></p>\n<p>${what}</p>\n<p>Use your browser's Back button to return.</p>`;
 }

@@ -34,6 +34,7 @@ import {
   renderPage,
   resolveLink,
   type AssetName,
+  type MissingReason,
   type PageOptions,
   type ScopedPath,
   type Session,
@@ -50,6 +51,8 @@ export interface ServerDeps {
   /** Rebuilds a folder session's tree; called when its entry page is reloaded. */
   readonly rediscover: (session: Session) => Promise<void>;
   readonly log: (message: string) => void;
+  /** Real paths the reader hid in Browsedown (ADR 0009): never served. */
+  readonly isHidden?: (real: string) => boolean;
 }
 
 /** Image types served as raw bytes. */
@@ -371,6 +374,11 @@ export class PreviewServer {
     if (request.real === undefined) {
       return this.missing(session, relPath, 'missing');
     }
+    // After both halves of the scope guard, on the real path: a symlink into a
+    // hidden folder is refused too. Images included.
+    if (this.deps.isHidden?.(request.real) === true) {
+      return this.missing(session, relPath, 'hidden');
+    }
     if (imageType !== undefined) {
       return { status: 200, type: imageType, body: await readFile(request.real), csp: CSP_IMAGE };
     }
@@ -417,7 +425,7 @@ export class PreviewServer {
     }
   }
 
-  private missing(session: Session, ref: string, reason: 'outside' | 'missing'): Reply {
+  private missing(session: Session, ref: string, reason: MissingReason): Reply {
     const page = this.page(session, {
       currentPath: '',
       title: 'Link not available',

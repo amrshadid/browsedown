@@ -102,6 +102,18 @@
         "title": "Open in Browser",
         "category": "Browsedown",
         "icon": "$(link-external)"
+      },
+      {
+        "command": "browsedown.hide",
+        "title": "Hide in Browsedown",
+        "category": "Browsedown",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "browsedown.unhide",
+        "title": "Unhide in Browsedown",
+        "category": "Browsedown",
+        "icon": "$(eye)"
       }
     ],
     "menus": {
@@ -110,6 +122,11 @@
           "command": "browsedown.openInBrowser",
           "when": "(explorerResourceIsFolder || resourceExtname =~ /^\\.(md|markdown|ya?ml)$/i) && !isWeb && !remoteName",
           "group": "navigation@90"
+        },
+        {
+          "command": "browsedown.hide",
+          "when": "(explorerResourceIsFolder || resourceExtname =~ /^\\.(md|markdown|ya?ml)$/i) && !isWeb && !remoteName",
+          "group": "navigation@91"
         }
       ],
       "commandPalette": [
@@ -152,6 +169,14 @@
         {
           "command": "browsedown.openEditor",
           "when": "resourceLangId == markdown && resourceScheme == file && !isWeb && !remoteName"
+        },
+        {
+          "command": "browsedown.hide",
+          "when": "resourceScheme == file && !isWeb && !remoteName"
+        },
+        {
+          "command": "browsedown.unhide",
+          "when": "!isWeb && !remoteName"
         }
       ],
       "view/title": [
@@ -211,6 +236,21 @@
           "command": "browsedown.openAll",
           "when": "view == browsedown.docs && viewItem == browsedown.workspace",
           "group": "navigation@1"
+        },
+        {
+          "command": "browsedown.unhide",
+          "when": "view == browsedown.docs && viewItem == browsedown.hidden",
+          "group": "inline"
+        },
+        {
+          "command": "browsedown.unhide",
+          "when": "view == browsedown.docs && viewItem == browsedown.hidden",
+          "group": "navigation@1"
+        },
+        {
+          "command": "browsedown.hide",
+          "when": "view == browsedown.docs && (viewItem == browsedown.folder || viewItem == browsedown.doc)",
+          "group": "navigation@9"
         }
       ],
       "editor/title": [

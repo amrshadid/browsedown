@@ -166,6 +166,26 @@ suite('previews over HTTP', () => {
     assert.equal(frame.body.match(/<script\b[^>]*>/gi)?.length, 2);
   });
 
+  test('Hide in Browsedown: a hidden folder leaves the tree and is not served', async () => {
+    const deep = at('docs/deep');
+    await vscode.commands.executeCommand('browsedown.hide', deep);
+    try {
+      const entry = await api.createPreview(at('docs'));
+      const { files } = await treeOf(entry);
+      assert.ok(!files.includes('deep/d.md'), 'the hidden folder is not in the tree');
+      assert.ok(files.includes('a.md'));
+      const page = await get(`${entry.replace(/\/$/, '')}/f/deep/d.md`);
+      assert.equal(page.status, 404);
+      assert.ok(page.body.includes('you hid in Browsedown'));
+    } finally {
+      await vscode.commands.executeCommand('browsedown.unhide', deep);
+    }
+    // Unhidden: served again, and back in a new preview's tree.
+    const entry = await api.createPreview(at('docs'));
+    assert.equal((await get(`${entry.replace(/\/$/, '')}/f/deep/d.md`)).status, 200);
+    assert.ok((await treeOf(entry)).files.includes('deep/d.md'));
+  });
+
   test('Stop All Previews closes the server', async () => {
     const entry = await api.createPreview(at('docs'));
     await vscode.commands.executeCommand('browsedown.stopAll');

@@ -29,6 +29,7 @@ src/
 │   ├── gitIgnore.ts      git ls-files / check-ignore
 │   ├── walker.ts         Folder walk for ignored folders and non-git folders
 │   ├── docsView.ts       The Browsedown sidebar: the workspace's docs, Open all
+│   ├── hidden.ts         Folders and files hidden in Browsedown (per workspace)
 │   └── command.ts        The Explorer command: selection → session → URL
 ├── client/
 │   ├── sidebar.ts        Tiny browser script: panels, theme, outline highlight
@@ -48,7 +49,8 @@ browser ── GET /s/<token>/f/docs/setup.md ──► server.ts
   1. method GET/HEAD, Host allowlist, Origin check
   2. routes.ts: parse the raw target; token → session (constant-time compare)
   3. scope.ts: decode once, reject hostile spellings
-  4. scopedFile.ts: realpath, must stay inside the root; allowed file type
+  4. scopedFile.ts: realpath, must stay inside the root; allowed file type;
+     not hidden in Browsedown (hidden.ts, on the real path)
   5. markdown.ts: render and sanitize; links.ts resolves every link
   6. pages.ts: wrap in the layout with a fresh script nonce
   7. respond with strict security headers (CSP, no-referrer, no CORS)

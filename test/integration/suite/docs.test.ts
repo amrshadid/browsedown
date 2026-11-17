@@ -109,6 +109,29 @@ suite('docs sidebar', () => {
     assert.ok(/href="[^"]*\/f\/docs\/README\.md" aria-current="page"/.test(page.body));
   });
 
+  test('a hidden doc leaves the Docs list, and comes back when unhidden', async () => {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    assert.ok(folder);
+    const readme = vscode.Uri.joinPath(folder.uri, 'docs', 'README.md');
+    await vscode.commands.executeCommand('browsedown.hide', readme);
+    try {
+      await vscode.commands.executeCommand('browsedown.refreshDocs');
+      assert.deepEqual([...(await api.docsFiles())], []);
+    } finally {
+      await vscode.commands.executeCommand('browsedown.unhide', readme);
+    }
+    await vscode.commands.executeCommand('browsedown.refreshDocs');
+    assert.deepEqual([...(await api.docsFiles())], ['docs/README.md']);
+  });
+
+  test('a workspace folder itself cannot be hidden', async () => {
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    assert.ok(folder);
+    await vscode.commands.executeCommand('browsedown.hide', folder.uri);
+    await vscode.commands.executeCommand('browsedown.refreshDocs');
+    assert.deepEqual([...(await api.docsFiles())], ['docs/README.md']);
+  });
+
   test('Stop All Previews ends the sidebar preview; the next one is new', async () => {
     const before = await api.docsPreview();
     await vscode.commands.executeCommand('browsedown.stopAll');

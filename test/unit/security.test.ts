@@ -7,13 +7,14 @@
  * links.test.ts, markdown.test.ts, pages.test.ts).
  */
 import * as http from 'node:http';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { pathFlavor, resolveRequestPath } from '../../src/adapters/scopedFile';
+import { discoverFolder } from '../../src/adapters/discovery';
+import { isStrictlyInside, pathFlavor, resolveRequestPath } from '../../src/adapters/scopedFile';
 import { newToken, PreviewServer, tokensEqual } from '../../src/adapters/server';
 import {
   applyDiscovery,
@@ -42,6 +43,11 @@ let server: PreviewServer;
 let port: number;
 let session: Session;
 const logs: string[] = [];
+/** What the reader hid in Browsedown (ADR 0009): a folder and a single file, as real paths. */
+let hiddenPaths: string[] = [];
+let aliasCreated = false;
+const isHidden = (real: string): boolean =>
+  hiddenPaths.some((h) => h === real || isStrictlyInside(h, real, process.platform));
 
 /** Sends a raw request: the target is sent exactly as given, and Host can be spoofed. */
 function request(
@@ -105,6 +111,22 @@ beforeAll(async () => {
       '',
     ].join('\n'),
   );
+  mkdirSync(join(docs, 'private'), { recursive: true });
+  writeFileSync(join(docs, 'private', 'plan.md'), '# Private plan\n\nDo not serve.\n');
+  writeFileSync(join(docs, 'private', 'pic.png'), 'not really a png\n');
+  writeFileSync(join(docs, 'note.md'), '# Hidden note\n');
+  writeFileSync(join(docs, 'links-hidden.md'), '[plan](private/plan.md) [note](note.md)\n');
+  try {
+    // Elsewhere in the folder, leading into the hidden one.
+    symlinkSync(join(docs, 'private', 'plan.md'), join(docs, 'alias.md'));
+    aliasCreated = true;
+  } catch {
+    aliasCreated = false; // Windows without symlink rights.
+  }
+  hiddenPaths = [
+    realpathSync.native(join(docs, 'private')),
+    realpathSync.native(join(docs, 'note.md')),
+  ];
   assets = mkdtempSync(join(tmpdir(), 'browsedown-assets-'));
   for (const name of [
     'github-markdown.css',
@@ -141,6 +163,7 @@ beforeAll(async () => {
     assetsDir: assets,
     rediscover: () => Promise.resolve(),
     log: (message) => logs.push(message),
+    isHidden,
   });
   port = await server.start();
 });
@@ -200,7 +223,7 @@ async function expectBlockedForThisPlatform(...encodedPaths: string[]): Promise<
 }
 
 interface Row {
-  /** The area of the control: network, requests, token, headers, files, paths, scripts, diagrams, logs. */
+  /** The area of the control: network, requests, token, headers, files, paths, scripts, diagrams, hidden, logs. */
   readonly area: string;
   readonly control: string;
   readonly run?: () => Promise<void>;
@@ -543,6 +566,56 @@ const rows: Row[] = [
     area: 'diagrams',
     control: 'the frame is sandboxed, and the page shows its output only as images',
     checkedIn: 'src/client/diagrams.ts; manual browser check before every release',
+  },
+  {
+    area: 'hidden',
+    control: 'never serves a hidden file, or a file or image in a hidden folder',
+    run: async () => {
+      for (const path of ['note.md', 'private/plan.md', 'private/pic.png']) {
+        const res = await request(file(path));
+        expect(res.status, path).toBe(404);
+        expect(res.body, path).toContain('you hid in Browsedown');
+        expect(res.body, path).not.toContain('Do not serve');
+        expect(res.headers['content-type'], path).toBe('text/html; charset=utf-8');
+      }
+      expect((await request(file('a.md'))).status).toBe(200); // Beside it: served.
+    },
+  },
+  {
+    area: 'hidden',
+    control: 'judges the real path: a symlink into a hidden folder is refused',
+    run: async () => {
+      if (!aliasCreated) {
+        return; // No symlink rights (Windows): the real-path rule is unit-tested in hidden.test.ts.
+      }
+      const res = await request(file('alias.md'));
+      expect(res.status).toBe(404);
+      expect(res.body).not.toContain('Do not serve');
+    },
+  },
+  {
+    area: 'hidden',
+    control: 'a link to a hidden file leads to the page that says why, never the file',
+    run: async () => {
+      const page = await request(file('links-hidden.md'));
+      expect(page.status).toBe(200);
+      const href = /href="([^"]*private\/plan\.md)"/.exec(page.body)?.[1] ?? '';
+      expect(href).not.toBe('');
+      const followed = await request(href.replace(/&#x26;/g, '&'));
+      expect(followed.status).toBe(404);
+      expect(followed.body).toContain('you hid in Browsedown');
+    },
+  },
+  {
+    area: 'hidden',
+    control: 'hidden files leave the tree, symlinks into them included',
+    run: async () => {
+      const result = await discoverFolder(docs, { trusted: true, isHidden });
+      expect(result.files).not.toContain('note.md');
+      expect(result.files.filter((f) => f.startsWith('private/'))).toEqual([]);
+      expect(result.files).not.toContain('alias.md');
+      expect(result.files).toContain('a.md');
+    },
   },
   {
     area: 'logs',

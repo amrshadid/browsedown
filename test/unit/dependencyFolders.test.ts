@@ -175,7 +175,7 @@ describe('discovery across stacks', () => {
   let root: string;
 
   beforeAll(() => {
-    root = realpathSync(mkdtempSync(join(tmpdir(), 'browsedown-stacks-')));
+    root = realpathSync.native(mkdtempSync(join(tmpdir(), 'browsedown-stacks-')));
     writeTree(root, [...KEPT, ...SKIPPED, ...EXTRA_FILES]);
   });
   afterAll(() => {
@@ -212,7 +212,7 @@ describe('discovery across stacks, in git', () => {
   beforeAll(() => {
     process.env.GIT_CONFIG_GLOBAL = EMPTY_GIT_CONFIG;
     process.env.GIT_CONFIG_NOSYSTEM = '1';
-    root = realpathSync(mkdtempSync(join(tmpdir(), 'browsedown-stacks-git-')));
+    root = realpathSync.native(mkdtempSync(join(tmpdir(), 'browsedown-stacks-git-')));
     writeTree(root, [...KEPT, ...SKIPPED, ...EXTRA_FILES, 'notes/plan.md']);
     // What projects usually ignore. The Go vendor/ and .NET bin/ are committed here,
     // as some repositories do, so git lists them: the rules must still drop them.

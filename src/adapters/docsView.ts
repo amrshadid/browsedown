@@ -33,6 +33,7 @@ import { canonicalPath } from './gitIgnore';
 import { folderSession } from './command';
 import { isStrictlyInside } from './scopedFile';
 import { discoverDocs } from './discovery';
+import type { HiddenPaths } from './hidden';
 import type { PreviewServer } from './server';
 
 /** One scanned workspace folder. */
@@ -47,7 +48,10 @@ export interface DocsRoot {
 export type DocsItem =
   | { readonly kind: 'workspace'; readonly root: DocsRoot }
   | { readonly kind: 'folder'; readonly root: DocsRoot; readonly node: TreeFolder }
-  | { readonly kind: 'doc'; readonly root: DocsRoot; readonly node: TreeFile };
+  | { readonly kind: 'doc'; readonly root: DocsRoot; readonly node: TreeFile }
+  /** The "Hidden" section: what the reader hid in Browsedown (ADR 0009). */
+  | { readonly kind: 'hiddenGroup' }
+  | { readonly kind: 'hidden'; readonly real: string };
 
 export interface DocsDeps {
   readonly sessions: SessionStore;
@@ -55,6 +59,8 @@ export interface DocsDeps {
   readonly log: (message: string) => void;
   /** `workspaceState`: remembers the toggle per workspace, nothing in the repository. */
   readonly state: vscode.Memento;
+  /** What the reader hid in Browsedown: left out of the list, shown in its own section. */
+  readonly hidden: HiddenPaths;
 }
 
 const SHOW_IGNORED_KEY = 'browsedown.showIgnored';
@@ -103,11 +109,17 @@ export class DocsView implements vscode.TreeDataProvider<DocsItem>, vscode.Dispo
     if (item === undefined) {
       const roots = await this.roots();
       const only = roots.length === 1 ? roots[0] : undefined;
-      return only === undefined
-        ? roots.map((root) => ({ kind: 'workspace', root }))
-        : itemsFor(only, only.tree);
+      const top: DocsItem[] =
+        only === undefined
+          ? roots.map((root) => ({ kind: 'workspace', root }))
+          : itemsFor(only, only.tree);
+      return this.deps.hidden.list().length > 0 ? [...top, { kind: 'hiddenGroup' }] : top;
     }
     switch (item.kind) {
+      case 'hiddenGroup':
+        return this.deps.hidden.list().map((real) => ({ kind: 'hidden', real }));
+      case 'hidden':
+        return [];
       case 'workspace':
         return itemsFor(item.root, item.root.tree);
       case 'folder':
@@ -119,6 +131,24 @@ export class DocsView implements vscode.TreeDataProvider<DocsItem>, vscode.Dispo
 
   getTreeItem(item: DocsItem): vscode.TreeItem {
     switch (item.kind) {
+      case 'hiddenGroup': {
+        const tree = new vscode.TreeItem('Hidden', vscode.TreeItemCollapsibleState.Collapsed);
+        tree.iconPath = new vscode.ThemeIcon('eye-closed');
+        tree.description = String(this.deps.hidden.list().length);
+        tree.tooltip = 'Hidden in Browsedown: not listed and not served.';
+        tree.contextValue = 'browsedown.hiddenGroup';
+        return tree;
+      }
+      case 'hidden': {
+        const tree = new vscode.TreeItem(
+          vscode.Uri.file(item.real),
+          vscode.TreeItemCollapsibleState.None,
+        );
+        tree.label = this.displayPath(item.real);
+        tree.tooltip = `${item.real}\nHidden in Browsedown: not listed and not served.`;
+        tree.contextValue = 'browsedown.hidden';
+        return tree;
+      }
       case 'workspace': {
         const tree = new vscode.TreeItem(
           item.root.folder.name,
@@ -182,6 +212,20 @@ export class DocsView implements vscode.TreeDataProvider<DocsItem>, vscode.Dispo
     this.changed.dispose();
   }
 
+  /** A hidden path, relative to its workspace folder when it is inside one. */
+  private displayPath(real: string): string {
+    for (const folder of vscode.workspace.workspaceFolders ?? []) {
+      const relative = path.relative(folder.uri.fsPath, real);
+      if (relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative)) {
+        const shown = relative.split(path.sep).join('/');
+        return (vscode.workspace.workspaceFolders?.length ?? 0) > 1
+          ? `${folder.name}/${shown}`
+          : shown;
+      }
+    }
+    return real;
+  }
+
   private async scanAll(): Promise<readonly DocsRoot[]> {
     const includeIgnored = this.showIgnored;
     const folders = (vscode.workspace.workspaceFolders ?? []).filter(
@@ -194,6 +238,7 @@ export class DocsView implements vscode.TreeDataProvider<DocsItem>, vscode.Dispo
         const result = await discoverDocs(realRoot, {
           trusted: vscode.workspace.isTrusted,
           includeIgnored,
+          isHidden: (real) => this.deps.hidden.isHidden(real),
         });
         const root = { folder, realRoot, result, tree: buildTree(result.files) };
         roots.push(root);

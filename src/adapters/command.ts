@@ -41,6 +41,8 @@ export interface PreviewDeps {
   readonly sessions: SessionStore;
   readonly server: PreviewServer;
   readonly log: (message: string) => void;
+  /** Real paths the reader hid in Browsedown: left out of the tree. */
+  readonly isHidden?: (real: string) => boolean;
 }
 
 /** Creates a preview session for `target` and returns its absolute URL. */
@@ -63,7 +65,10 @@ export async function createPreview(deps: PreviewDeps, target: vscode.Uri): Prom
   if (session.mode === 'folder') {
     applyDiscovery(
       session,
-      await discoverFolder(session.scopeRoot, { trusted: vscode.workspace.isTrusted }),
+      await discoverFolder(session.scopeRoot, {
+        trusted: vscode.workspace.isTrusted,
+        ...(deps.isHidden === undefined ? {} : { isHidden: deps.isHidden }),
+      }),
     );
     deps.log(
       `Opened a folder preview (${String(session.files?.length ?? 0)} Markdown files, ${session.discovery ?? 'walk'}).`,

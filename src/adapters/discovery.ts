@@ -28,6 +28,8 @@ const MARKDOWN = /\.(md|markdown)$/i;
 export interface DiscoveryOptions {
   /** `vscode.workspace.isTrusted`: git never runs in an untrusted workspace. */
   readonly trusted: boolean;
+  /** Real paths the reader hid in Browsedown (ADR 0009): their files are left out. */
+  readonly isHidden?: (real: string) => boolean;
 }
 
 export async function discoverFolder(
@@ -61,7 +63,7 @@ export async function discoverFolder(
     candidates = withoutDependencyFolders(candidates);
   }
   const markdown = [...new Set(candidates.filter((file) => MARKDOWN.test(file)))];
-  const kept = await filterInScope(root, markdown);
+  const kept = await filterInScope(root, markdown, options.isHidden);
   return { files: kept, discovery, truncated };
 }
 
@@ -120,7 +122,7 @@ export async function discoverDocs(root: string, options: DocsOptions): Promise<
     files.push(...found.files.map((file) => `${folder}${file}`));
     truncated ||= found.truncated;
   }
-  const extra = await filterInScope(root, [...new Set(files)]);
+  const extra = await filterInScope(root, [...new Set(files)], options.isHidden);
   return {
     files: [...new Set([...base.files, ...extra])],
     discovery: base.discovery,
@@ -163,8 +165,15 @@ function folderPrefixes(paths: readonly string[]): string[] {
   return [...prefixes].sort((a, b) => a.length - b.length);
 }
 
-/** Keeps the paths that pass both halves of the scope guard, a batch at a time. */
-async function filterInScope(root: string, paths: readonly string[]): Promise<string[]> {
+/**
+ * Keeps the paths that pass both halves of the scope guard and whose real path
+ * isn't hidden (a symlink into a hidden folder is dropped too), a batch at a time.
+ */
+async function filterInScope(
+  root: string,
+  paths: readonly string[],
+  isHidden: (real: string) => boolean = () => false,
+): Promise<string[]> {
   const flavor = pathFlavor();
   const realRoot = await realpath(root); // Once per scan, not once per file.
   const kept: string[] = [];
@@ -173,7 +182,8 @@ async function filterInScope(root: string, paths: readonly string[]): Promise<st
     const results = await Promise.all(
       paths.slice(i, i + batch).map(async (file) => {
         const check = checkDecodedPath(file, flavor);
-        return check.ok && (await resolveInRealRoot(realRoot, check.value)) !== undefined;
+        const real = check.ok ? await resolveInRealRoot(realRoot, check.value) : undefined;
+        return real !== undefined && !isHidden(real);
       }),
     );
     paths.slice(i, i + batch).forEach((file, index) => {

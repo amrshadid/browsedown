@@ -84,3 +84,26 @@ describe('URL builders', () => {
     expect(indexUrl(T)).toBe(`/s/${T}/__index`);
   });
 });
+
+describe('the dead-link reason', () => {
+  it.each([
+    ['outside', 'outside'],
+    ['missing', 'missing'],
+    ['hidden', 'hidden'],
+    ['anything-else', 'outside'],
+  ])('why=%s reads as %s', (why, reason) => {
+    expect(parseRoute(`/s/${T}/__missing?ref=x&why=${why}`)).toEqual({
+      kind: 'missing',
+      token: T,
+      ref: 'x',
+      reason,
+    });
+  });
+
+  it('round-trips through missingUrl', () => {
+    expect(parseRoute(missingUrl(T, 'docs/bugs/a.md', 'hidden'))).toMatchObject({
+      reason: 'hidden',
+      ref: 'docs/bugs/a.md',
+    });
+  });
+});
