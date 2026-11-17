@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="#c5c5c5" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round">
+  <!-- Activity Bar icon: an open book (reading docs) with an "open outside" arrow
+       (in the browser). VS Code paints it in the theme's colour. -->
+  <path d="M2.75 6.75c2.5-1 5-.9 7.75.75v12.25c-2.75-1.65-5.25-1.75-7.75-.75z" />
+  <path d="M10.5 7.5c1.25-.75 2.5-1.15 3.75-1.25M10.5 19.75c2.75-1.65 5.25-1.75 7.75-.75v-4" />
+  <path d="M15.5 3h5.75v5.75M21.25 3l-6 6" />
+</svg>

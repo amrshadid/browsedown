@@ -1,8 +1,10 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { canonicalPath, GitIgnore } from '../../src/adapters/gitIgnore';
+import { canonicalPath, GitIgnore, run } from '../../src/adapters/gitIgnore';
 import {
   createIgnoreTableRepo,
   EMPTY_GIT_CONFIG,
@@ -84,3 +86,21 @@ function restore(key: string, value: string | undefined): void {
     process.env[key] = value;
   }
 }
+
+describe('git process handling', () => {
+  // Regression: the input to git's stdin had no error handler. A process that exits
+  // before reading it makes the write fail with EPIPE: an uncaught exception in the
+  // extension host (Vitest fails the run on one). 1 MB overflows the pipe buffer, so
+  // the write is still pending when the process exits. Node stands in for git: the
+  // options run() prepends (`-c …`) make it exit at once, on every OS.
+  it('survives a process that exits before it reads its input', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'browsedown-epipe-'));
+    try {
+      for (let i = 0; i < 5; i += 1) {
+        await expect(run(process.execPath, cwd, [], 'x'.repeat(1024 * 1024))).rejects.toThrow();
+      }
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+});

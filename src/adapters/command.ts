@@ -76,7 +76,8 @@ export async function createPreview(deps: PreviewDeps, target: vscode.Uri): Prom
   return deps.server.url(entryUrl(session.token));
 }
 
-async function folderSession(folder: string): Promise<Session> {
+/** A new folder session for `folder` (resolved to its real path), before discovery. */
+export async function folderSession(folder: string): Promise<Session> {
   const root = await realpath(folder);
   return {
     token: newToken(),

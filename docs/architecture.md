@@ -28,6 +28,7 @@ src/
 │   ├── discovery.ts      Chooses git or the walker; filters through the guard
 │   ├── gitIgnore.ts      git ls-files / check-ignore
 │   ├── walker.ts         Folder walk for ignored folders and non-git folders
+│   ├── docsView.ts       The Browsedown sidebar: the workspace's docs, Open all
 │   └── command.ts        The Explorer command: selection → session → URL
 ├── client/
 │   ├── sidebar.ts        Tiny browser script: panels, theme, outline highlight
@@ -99,6 +100,11 @@ page (strict CSP + frame-src 'self') ── postMessage(source, theme) ──►
   file (`target/` beside `Cargo.toml`). The walker judges folders as it goes, so it never
   descends into them; git's listing is filtered afterwards, judging each folder from the
   listed paths. A folder opened inside one of them is shown whole.
+- **The Browsedown sidebar:** each workspace folder, the same way as opening it. With **Show
+  Ignored Folders**, `git ls-files --others --ignored --directory` names what git ignores, and
+  each topmost ignored folder is then discovered as if it were opened explicitly
+  (dependency folders are never entered). The sidebar keeps one preview session per
+  workspace folder, fed from its own scan, so **Open all** and clicking a doc share one tree.
 
 ## Why these choices
 

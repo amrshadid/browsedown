@@ -15,6 +15,7 @@ import * as path from 'node:path';
 import {
   checkDecodedPath,
   isDependencyFolder,
+  isDependencyFolderByName,
   withoutDependencyFolders,
   type DiscoveryResult,
 } from '../core';
@@ -64,6 +65,74 @@ export async function discoverFolder(
   return { files: kept, discovery, truncated };
 }
 
+export interface DocsOptions extends DiscoveryOptions {
+  /** Also list the Markdown in folders and files git ignores (ADR 0008). */
+  readonly includeIgnored: boolean;
+}
+
+/**
+ * The Markdown of a whole folder for the docs sidebar and its previews: the same
+ * as {@link discoverFolder}, plus, when `includeIgnored` is on, the Markdown git
+ * ignores. Each topmost ignored folder is read as if it were opened explicitly
+ * (its own `.gitignore` files only), except dependency, environment and build
+ * folders (`core/dependencyFolders.ts`), which are never entered. Outside git, or
+ * in an untrusted workspace, there is nothing to add.
+ */
+export async function discoverDocs(root: string, options: DocsOptions): Promise<DiscoveryResult> {
+  const base = await discoverFolder(root, options);
+  if (!options.includeIgnored || !options.trusted) {
+    return base;
+  }
+  const git = await GitIgnore.detect(root);
+  if (git === undefined || (await git.isFolderIgnored().catch(() => true))) {
+    return base; // An ignored root was walked whole already.
+  }
+  // A quick first pass on names alone; each ignored folder is judged fully below.
+  const noSiblings = new Set<string>();
+  const entries = (await git.listIgnored()).filter(
+    (entry) =>
+      !entry
+        .split('/')
+        .slice(0, -1)
+        .some((segment) => isDependencyFolderByName(segment, noSiblings)),
+  );
+  const ignoredFolders = new Set(await git.ignoredFolders(folderPrefixes(entries)));
+
+  const roots = new Set<string>();
+  const files: string[] = [];
+  for (const entry of entries) {
+    const folder = folderPrefixes([entry]).find((prefix) => ignoredFolders.has(prefix));
+    if (folder !== undefined) {
+      roots.add(folder);
+    } else if (entry.endsWith('/')) {
+      roots.add(entry); // Collapsed by a content rule (`dir/**`): the folder itself isn't ignored.
+    } else if (MARKDOWN.test(entry)) {
+      files.push(entry);
+    }
+  }
+
+  let truncated = base.truncated;
+  for (const folder of roots) {
+    if (await isDependencyFolderOnDisk(root, folder)) {
+      continue; // `.venv/`, `target/` beside `Cargo.toml`, …: never entered.
+    }
+    const found = await discoverFolder(path.join(root, ...folder.split('/')), options);
+    files.push(...found.files.map((file) => `${folder}${file}`));
+    truncated ||= found.truncated;
+  }
+  const extra = await filterInScope(root, [...new Set(files)]);
+  return {
+    files: [...new Set([...base.files, ...extra])],
+    discovery: base.discovery,
+    truncated,
+  };
+}
+
+/** Judges an ignored folder (`a/b/`, relative to `root`) from what is inside it and beside it. */
+function isDependencyFolderOnDisk(root: string, folder: string): Promise<boolean> {
+  return judgeOnDisk(path.join(root, ...folder.split('/').filter((segment) => segment !== '')));
+}
+
 async function judgeOnDisk(absolute: string): Promise<boolean> {
   const list = async (dir: string): Promise<Set<string>> =>
     new Set(await readdir(dir).catch(() => [] as string[]));
@@ -79,6 +148,19 @@ async function isInDependencyFolder(root: string): Promise<boolean> {
     }
   }
   return false;
+}
+
+/** Every folder above each path, shortest first, as `a/`, `a/b/`; a folder entry includes itself. */
+function folderPrefixes(paths: readonly string[]): string[] {
+  const prefixes = new Set<string>();
+  for (const entry of paths) {
+    const segments = entry.split('/');
+    // `a/b/` splits to ['a', 'b', '']: the folder itself counts. `a/b.md`: only `a/`.
+    for (let i = 1; i < segments.length; i += 1) {
+      prefixes.add(`${segments.slice(0, i).join('/')}/`);
+    }
+  }
+  return [...prefixes].sort((a, b) => a.length - b.length);
 }
 
 /** Keeps the paths that pass both halves of the scope guard, a batch at a time. */
