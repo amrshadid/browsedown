@@ -8,12 +8,12 @@ You get a GitHub-style page, a sidebar tree scoped to exactly what you picked, a
 anchors and Back/Forward that just work. No config, and nothing is written to your repository.
 
 > [!NOTE]
-> **Pilot pre-release (v0.1.0).** It works, and we're testing it with a few readers before a
+> **Pilot pre-release.** It works, and we're testing it with a few readers before a
 > wider release. Feedback is very welcome: [open an issue](https://github.com/amrshadid/browsedown/issues).
 
 ## Install
 
-Download `browsedown-0.1.0.vsix` from the [latest release](https://github.com/amrshadid/browsedown/releases), then in VS Code
+Download the `.vsix` file from the [latest release](https://github.com/amrshadid/browsedown/releases), then in VS Code
 open the Extensions view, choose **…** → **Install from VSIX…**, and pick the file. It needs
 VS Code 1.100 or newer on a local desktop window.
 
