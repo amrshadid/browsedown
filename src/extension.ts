@@ -1,3 +1,4 @@
+import { realpath } from 'node:fs/promises';
 import * as path from 'node:path';
 
 import * as vscode from 'vscode';
@@ -5,6 +6,7 @@ import * as vscode from 'vscode';
 import { createPreview, PreviewError } from './adapters/command';
 import { discoverDocs } from './adapters/discovery';
 import { DocsView, type DocsItem, type DocsRoot } from './adapters/docsView';
+import { HiddenPaths } from './adapters/hidden';
 import { errorCode, PreviewServer, tokensEqual } from './adapters/server';
 import { applyDiscovery, SessionStore } from './core';
 
@@ -34,10 +36,14 @@ export function activate(context: vscode.ExtensionContext): BrowsedownApi {
     output.info(message);
   };
   const sessions = new SessionStore(tokensEqual);
+  // What the reader hid in Browsedown (ADR 0009): not listed and not served.
+  const hidden = new HiddenPaths(context.workspaceState);
+  const isHidden = (real: string): boolean => hidden.isHidden(real);
   const server = new PreviewServer({
     sessions,
     assetsDir: context.asAbsolutePath('dist/assets'),
     log,
+    isHidden,
     // Reloading a folder's entry page rebuilds its tree, the way it was first found.
     rediscover: async (session) => {
       applyDiscovery(
@@ -45,11 +51,13 @@ export function activate(context: vscode.ExtensionContext): BrowsedownApi {
         await discoverDocs(session.scopeRoot, {
           trusted: vscode.workspace.isTrusted,
           includeIgnored: session.includeIgnored === true,
+          isHidden,
         }),
       );
     },
   });
-  const docs = new DocsView({ sessions, server, log, state: context.workspaceState });
+  const previewDeps = { sessions, server, log, isHidden };
+  const docs = new DocsView({ sessions, server, log, state: context.workspaceState, hidden });
   const docsTree = vscode.window.createTreeView('browsedown.docs', {
     treeDataProvider: docs,
     showCollapseAll: true,
@@ -64,7 +72,7 @@ export function activate(context: vscode.ExtensionContext): BrowsedownApi {
     return root;
   };
   const api: BrowsedownApi = {
-    createPreview: (target) => createPreview({ sessions, server, log }, target),
+    createPreview: (target) => createPreview(previewDeps, target),
     docsFiles: async () => (await firstRoot()).result.files,
     docsPreview: async (doc) => docs.previewUrl(await firstRoot(), doc),
     // A file in a workspace folder opens in that folder's "all docs" preview, with the
@@ -72,7 +80,7 @@ export function activate(context: vscode.ExtensionContext): BrowsedownApi {
     editorPreview: async (file) => {
       const found = file.scheme === 'file' ? await docs.locate(file.fsPath) : undefined;
       return found === undefined
-        ? createPreview({ sessions, server, log }, file)
+        ? createPreview(previewDeps, file)
         : docs.previewUrl(found.root, found.doc);
     },
   };
@@ -91,9 +99,71 @@ export function activate(context: vscode.ExtensionContext): BrowsedownApi {
     }
   };
 
+  /**
+   * Opening something hidden is an explicit choice against an earlier one: ask.
+   * Resolves true when it isn't hidden, or the reader chose to unhide it.
+   */
+  const allowHidden = async (target: vscode.Uri): Promise<boolean> => {
+    const real = target.scheme === 'file' ? await realpath(target.fsPath).catch(() => '') : '';
+    const covering = real === '' ? [] : hidden.covering(real);
+    if (covering.length === 0) {
+      return true;
+    }
+    const choice = await vscode.window.showInformationMessage(
+      `"${path.basename(real)}" is hidden in Browsedown, so it isn't shown or served.`,
+      'Unhide and Open',
+    );
+    if (choice !== 'Unhide and Open') {
+      return false;
+    }
+    await hidden.unhide(covering);
+    return true;
+  };
+
+  /** Real paths of the targets of a hide or unhide command, from the Explorer, the Docs view or the editor. */
+  const targetsOf = async (
+    item: DocsItem | vscode.Uri | undefined,
+    selected: readonly vscode.Uri[] | undefined,
+  ): Promise<string[]> => {
+    let paths: string[] = [];
+    if (selected !== undefined && selected.length > 0) {
+      paths = selected.filter((uri) => uri.scheme === 'file').map((uri) => uri.fsPath);
+    } else if (item instanceof vscode.Uri) {
+      paths = item.scheme === 'file' ? [item.fsPath] : [];
+    } else if (item?.kind === 'folder' || item?.kind === 'doc') {
+      paths = [path.join(item.root.realRoot, ...item.node.path.split('/'))];
+    } else if (item?.kind === 'hidden') {
+      paths = [item.real];
+    } else if (item === undefined) {
+      const active = vscode.window.activeTextEditor?.document.uri;
+      paths = active?.scheme === 'file' ? [active.fsPath] : [];
+    }
+    // A path that no longer exists (unhiding a deleted folder) is used as stored.
+    return Promise.all(paths.map((p) => realpath(p).catch(() => p)));
+  };
+
+  /** Keeps open previews in step: hidden files leave their trees now, unhidden ones on reload. */
+  const onHiddenChanged = (): void => {
+    for (const session of sessions.all()) {
+      if (session.mode !== 'folder' || session.files === undefined) {
+        continue;
+      }
+      const files = session.files.filter(
+        (file) => !hidden.isHidden(path.join(session.scopeRoot, ...file.split('/'))),
+      );
+      applyDiscovery(session, {
+        files,
+        discovery: session.discovery ?? 'walk',
+        truncated: session.truncated,
+      });
+      session.fresh = false; // The next load of its entry page rediscovers: unhidden files return.
+    }
+    docs.refresh();
+  };
+
   /** "Open all": the item's workspace folder, the only one, or one the reader picks. */
   const pickRoot = async (item?: DocsItem): Promise<DocsRoot | undefined> => {
-    if (item !== undefined) {
+    if (item?.kind === 'workspace' || item?.kind === 'folder' || item?.kind === 'doc') {
       return item.root;
     }
     const roots = await docs.roots();
@@ -121,17 +191,66 @@ export function activate(context: vscode.ExtensionContext): BrowsedownApi {
           );
           return;
         }
-        await openInBrowser(() => api.createPreview(target));
+        if (await allowHidden(target)) {
+          await openInBrowser(() => api.createPreview(target));
+        }
       },
     ),
     docs,
     docsTree,
+    hidden.onDidChange(onHiddenChanged),
     vscode.commands.registerCommand('browsedown.openEditor', async (uri?: vscode.Uri) => {
       const target = uri ?? vscode.window.activeTextEditor?.document.uri;
-      if (target !== undefined) {
+      if (target !== undefined && (await allowHidden(target))) {
         await openInBrowser(() => api.editorPreview(target));
       }
     }),
+    vscode.commands.registerCommand(
+      'browsedown.hide',
+      async (item?: DocsItem | vscode.Uri, selected?: vscode.Uri[]) => {
+        const targets = await targetsOf(item, selected);
+        const roots = await Promise.all(
+          (vscode.workspace.workspaceFolders ?? []).map((folder) =>
+            realpath(folder.uri.fsPath).catch(() => folder.uri.fsPath),
+          ),
+        );
+        const allowed = targets.filter((target) => !roots.includes(target));
+        if (allowed.length < targets.length) {
+          void vscode.window.showInformationMessage(
+            "A workspace folder can't be hidden in Browsedown. Hide the folders inside it instead.",
+          );
+        }
+        if (allowed.length > 0) {
+          await hidden.hide(allowed);
+          vscode.window.setStatusBarMessage(
+            allowed.length === 1
+              ? `Hidden in Browsedown: ${path.basename(allowed[0] ?? '')}`
+              : `Hidden in Browsedown: ${String(allowed.length)} items`,
+            4000,
+          );
+        }
+      },
+    ),
+    vscode.commands.registerCommand(
+      'browsedown.unhide',
+      async (item?: DocsItem | vscode.Uri, selected?: vscode.Uri[]) => {
+        let targets = item === undefined ? [] : await targetsOf(item, selected);
+        if (targets.length === 0) {
+          const picked = await vscode.window.showQuickPick(
+            hidden.list().map((real) => ({ label: path.basename(real), description: real, real })),
+            {
+              canPickMany: true,
+              placeHolder:
+                hidden.list().length === 0
+                  ? 'Nothing is hidden in Browsedown.'
+                  : 'Which hidden folders or files should Browsedown show again?',
+            },
+          );
+          targets = (picked ?? []).map((entry) => entry.real);
+        }
+        await hidden.unhide(targets);
+      },
+    ),
     vscode.commands.registerCommand('browsedown.refreshDocs', () => {
       docs.refresh();
     }),

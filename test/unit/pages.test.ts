@@ -224,3 +224,12 @@ describe('renderPage with diagrams', () => {
     expect(html).toContain('data-bd-diagrams="/x&quot;&gt;&lt;script&gt;"');
   });
 });
+
+describe('renderMissingBody for a hidden file', () => {
+  it('says the reader hid it, and where to unhide it', () => {
+    const body = renderMissingBody('bugs/<x>.md', 'hidden', 'docs');
+    expect(body).toContain('you hid in Browsedown');
+    expect(body).toContain('Hidden section');
+    expect(body).toContain('bugs/&lt;x&gt;.md'); // Escaped.
+  });
+});

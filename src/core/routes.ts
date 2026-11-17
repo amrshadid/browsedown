@@ -21,7 +21,8 @@ export type AssetName = (typeof ASSET_NAMES)[number];
 export const MERMAID_FRAME_PATH = '/__mermaid';
 
 /** Why a link leads to the explanation page instead of a file. */
-export type MissingReason = 'outside' | 'missing';
+/** Why a link leads to the explanation page: outside the scope, not there, or hidden by the reader. */
+export type MissingReason = 'outside' | 'missing' | 'hidden';
 
 export type Route =
   | { readonly kind: 'asset'; readonly name: AssetName }
@@ -78,7 +79,8 @@ export function parseRoute(target: string): Route {
   }
   if (rest === '/__missing') {
     const params = new URLSearchParams(query);
-    const reason = params.get('why') === 'missing' ? 'missing' : 'outside';
+    const why = params.get('why');
+    const reason = why === 'missing' || why === 'hidden' ? why : 'outside';
     return { kind: 'missing', token, ref: params.get('ref') ?? '', reason };
   }
   if (rest.startsWith('/f/') && rest.length > '/f/'.length) {

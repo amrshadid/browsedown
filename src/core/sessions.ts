@@ -87,6 +87,11 @@ export class SessionStore {
     this.sessions.length = 0;
   }
 
+  /** Every open session, for updating them all at once (e.g. after hiding a folder). */
+  all(): readonly Session[] {
+    return this.sessions;
+  }
+
   get size(): number {
     return this.sessions.length;
   }

@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Hide in Browsedown.** Right-click a folder or file in the Explorer or the Browsedown view
+  to hide it: it leaves every tree and list and is never served, judged on its real path, so
+  a symlink into it is refused too. It works for tracked files, and Show Ignored Folders
+  doesn't bring it back. Saved per workspace in VS Code; nothing is written to the
+  repository. Unhide from the Hidden section of the Browsedown view or the Command Palette.
+
 ## [0.3.0] - 2026-11-17
 
 Third pilot pre-release.

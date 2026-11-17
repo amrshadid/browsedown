@@ -89,14 +89,16 @@ which one it is, never a silent error or the wrong file.
 
 ## Commands
 
-| Command                           | Where                                                 |
-| --------------------------------- | ----------------------------------------------------- |
-| **Open in Browser**               | Right-click a folder, Markdown or YAML file           |
-| **Open in Browser** (editor)      | The title bar of an open Markdown file                |
-| **Open All in Browser**           | The Browsedown view, or the Command Palette           |
-| **Show / Hide Ignored Folders**   | The Browsedown view, or the Command Palette           |
-| **Refresh Docs**                  | The Browsedown view, or the Command Palette           |
-| **Browsedown: Stop All Previews** | Command Palette. Closes the local server immediately. |
+| Command                           | Where                                                                |
+| --------------------------------- | -------------------------------------------------------------------- |
+| **Open in Browser**               | Right-click a folder, Markdown or YAML file                          |
+| **Open in Browser** (editor)      | The title bar of an open Markdown file                               |
+| **Open All in Browser**           | The Browsedown view, or the Command Palette                          |
+| **Show / Hide Ignored Folders**   | The Browsedown view, or the Command Palette                          |
+| **Refresh Docs**                  | The Browsedown view, or the Command Palette                          |
+| **Hide in Browsedown**            | Right-click a folder or file, in the Explorer or the Browsedown view |
+| **Unhide in Browsedown**          | The Hidden section of the Browsedown view, or the Command Palette    |
+| **Browsedown: Stop All Previews** | Command Palette. Closes the local server immediately.                |
 
 Previews also stop when VS Code closes. Nothing runs when no preview is open.
 
@@ -117,6 +119,13 @@ Automatic discovery follows git. Opening something yourself is an explicit choic
 
 A tracked file stays visible even if an ignore pattern matches it later, as in git
 ([gitignore documentation](https://git-scm.com/docs/gitignore)).
+
+**Hide what you don't want to read or serve.** Right-click a folder or file (for example
+`docs/bugs/`) in the Explorer or the Browsedown view and choose **Hide in Browsedown**. It
+leaves every tree and list, and Browsedown won't serve it: a link to it leads to a page that
+says you hid it. This works for files git tracks too, and **Show Ignored Folders** doesn't
+bring it back. It's saved for you in this workspace only; nothing is written to the
+repository. Unhide it from the **Hidden** section at the bottom of the Browsedown view.
 
 **Packages, environments and build output are skipped, in every stack.** Their Markdown is
 thousands of package READMEs, not your docs, so Browsedown never looks inside them, even if
