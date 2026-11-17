@@ -21,6 +21,13 @@ export {
   type OutlineEntry,
   type PageOptions,
 } from './pages';
+export {
+  hasDependencyMarker,
+  isDependencyFolder,
+  isDependencyFolderByName,
+  withoutDependencyFolders,
+  type FolderContext,
+} from './dependencyFolders';
 export { IgnoreRules } from './ignoreWalk';
 export { resolveLink, type LinkTarget } from './links';
 export { renderMermaidFrame } from './mermaidFrame';

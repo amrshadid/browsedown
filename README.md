@@ -92,6 +92,24 @@ Automatic discovery follows git. Opening something yourself is an explicit choic
 A tracked file stays visible even if an ignore pattern matches it later, as in git
 ([gitignore documentation](https://git-scm.com/docs/gitignore)).
 
+**Packages, environments and build output are skipped, in every stack.** Their Markdown is
+thousands of package READMEs, not your docs, so Browsedown never looks inside them, even if
+the repository commits them (a `vendor/` folder, say). A folder is skipped when:
+
+- its name belongs to one tool: `node_modules`, `__pycache__`, `.venv`, `.tox`, `.gradle`,
+  `Pods`, `.dart_tool`, `.stack-work`, `elm-stuff`, `.terraform` and more;
+- it holds a marker file, whatever it's called: `pyvenv.cfg` (any Python virtual
+  environment), `conda-meta` (Conda) or `CACHEDIR.TAG` (Rust's `target/` and other caches);
+- or its name is generic and the tool that creates it is right beside it: `target/` next to
+  `Cargo.toml` or `pom.xml`, `vendor/` next to `go.mod`, `composer.json` or `Gemfile`,
+  `bin/` and `obj/` next to a `.csproj`, `build/` next to a Gradle, CMake or Flutter build
+  file, `deps/` and `_build/` next to `mix.exs`. A `build/` folder of real docs with no
+  build file beside it is listed as usual.
+
+Opening one of these folders yourself shows all of it: your explicit choice wins. The
+complete list is in
+[`src/core/dependencyFolders.ts`](src/core/dependencyFolders.ts).
+
 ## Private and safe by default
 
 A local server that serves your files is something any web page you visit could try to
