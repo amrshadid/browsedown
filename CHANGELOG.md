@@ -6,13 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-17
+
+Third pilot pre-release.
+
 ### Added
 
 - **The Browsedown sidebar.** A view in the Activity Bar lists every Markdown file in the
   workspace, the way git sees them. **Open All in Browser** opens the whole list with its
   tree; clicking a doc opens it in that same view. **Show Ignored Folders** adds the docs in
-  folders `.gitignore` hides, each read as if you had opened it. The
-  list is gathered only while the view is open, and updates when files change in VS Code.
+  folders `.gitignore` hides, each read as if you had opened it. The list is gathered only
+  while the view is open, and updates when files change in VS Code.
 - **Packages, environments and build output are skipped in every stack**: `node_modules`,
   Python virtual environments whatever they're called, Rust and Maven `target/`, Go, PHP and
   Ruby `vendor/`, .NET `bin/` and `obj/`, CocoaPods, Gradle, Dart, Haskell, Elixir,
@@ -70,6 +74,7 @@ First pilot pre-release.
   No remote images, no network calls, no telemetry. Read-only.
 - Logs hold lifecycle events and error codes only: no paths, tokens or file contents.
 
-[Unreleased]: https://github.com/amrshadid/browsedown/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/amrshadid/browsedown/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/amrshadid/browsedown/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/amrshadid/browsedown/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/amrshadid/browsedown/releases/tag/v0.1.0
