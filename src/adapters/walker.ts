@@ -1,15 +1,17 @@
 /**
  * Walks a folder when git can't list it (ignored by git, outside git, or an
  * untrusted workspace). Applies only the `.gitignore` files inside the folder,
- * never enters ignored folders or `.git`, and never follows a symlink to a folder
- * (no escapes, no cycles). A symlink to a file is listed; discovery drops it if
- * the scope guard refuses it. Stops after `cap` entries and says so.
+ * never enters ignored folders, `.git`, or dependency, environment and build
+ * folders (`core/dependencyFolders.ts`; the walked folder itself is never judged),
+ * and never follows a symlink to a folder (no escapes, no cycles). A symlink to a
+ * file is listed; discovery drops it if the scope guard refuses it. Stops after
+ * `cap` entries and says so.
  */
 import type { Dirent } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import * as path from 'node:path';
 
-import { IgnoreRules } from '../core';
+import { hasDependencyMarker, IgnoreRules, isDependencyFolderByName } from '../core';
 import { canonicalPath } from './gitIgnore';
 
 /** Enough for any docs folder; a cap keeps a huge tree from stalling the preview. */
@@ -21,7 +23,15 @@ export interface WalkResult {
   readonly truncated: boolean;
 }
 
-export async function walkFolder(root: string, cap = WALK_CAP): Promise<WalkResult> {
+/**
+ * `skipDependencies: false` walks everything (still not `.git`): for a folder that
+ * is itself inside a dependency or environment folder, opened on purpose.
+ */
+export async function walkFolder(
+  root: string,
+  cap = WALK_CAP,
+  skipDependencies = true,
+): Promise<WalkResult> {
   const rules = new IgnoreRules();
   const files: string[] = [];
   const queue: string[] = [''];
@@ -36,6 +46,10 @@ export async function walkFolder(root: string, cap = WALK_CAP): Promise<WalkResu
       entries = await readdir(absolute, { withFileTypes: true });
     } catch {
       continue; // Unreadable folder: skip it, like git would.
+    }
+    const names = new Set(entries.map((entry) => entry.name));
+    if (skipDependencies && folder !== '' && hasDependencyMarker(names)) {
+      continue; // A virtual environment or a cache, whatever it is called.
     }
     if (entries.some((entry) => entry.name === '.gitignore' && entry.isFile())) {
       try {
@@ -54,7 +68,8 @@ export async function walkFolder(root: string, cap = WALK_CAP): Promise<WalkResu
       }
       const relative = canonicalPath(folder === '' ? entry.name : `${folder}/${entry.name}`);
       if (entry.isDirectory()) {
-        if (!rules.isIgnored(relative, true)) {
+        const dependency = skipDependencies && isDependencyFolderByName(entry.name, names);
+        if (!rules.isIgnored(relative, true) && !dependency) {
           queue.push(relative);
         }
       } else if (entry.isFile()) {

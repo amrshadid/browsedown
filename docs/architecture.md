@@ -15,6 +15,7 @@ src/
 │   ├── sessions.ts       In-memory preview sessions
 │   ├── tree.ts           Paths → sidebar tree
 │   ├── ignoreWalk.ts     .gitignore rules inside an opened ignored folder
+│   ├── dependencyFolders.ts  Packages, environments and build output, for every stack
 │   ├── pages.ts          HTML page templates (layout, index, dead-link page)
 │   ├── mermaidFrame.ts   The sandboxed diagram renderer's document
 │   └── html.ts           Escaping for the templates
@@ -92,6 +93,12 @@ page (strict CSP + frame-src 'self') ── postMessage(source, theme) ──►
   the `.gitignore` files inside it, plus any files git tracks there. Rules from outside the
   folder don't apply: the folder you picked is the boundary.
 - **A single file:** no scan at all.
+- **Packages, environments and build output** are never entered, in either path
+  (`core/dependencyFolders.ts`): a name that belongs to one tool, a marker inside the folder
+  (`pyvenv.cfg`, `conda-meta`, `CACHEDIR.TAG`), or a generic name beside the tool's project
+  file (`target/` beside `Cargo.toml`). The walker judges folders as it goes, so it never
+  descends into them; git's listing is filtered afterwards, judging each folder from the
+  listed paths. A folder opened inside one of them is shown whole.
 
 ## Why these choices
 

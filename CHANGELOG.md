@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Packages, environments and build output are skipped in every stack**: `node_modules`,
+  Python virtual environments whatever they're called, Rust and Maven `target/`, Go, PHP and
+  Ruby `vendor/`, .NET `bin/` and `obj/`, CocoaPods, Gradle, Dart, Haskell, Elixir,
+  Terraform and more, even when a repository commits them. Opening one yourself shows it.
+
 ## [0.2.0] - 2026-11-16
 
 Second pilot pre-release.
