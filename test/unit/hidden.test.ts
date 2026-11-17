@@ -92,7 +92,9 @@ describe('discovery leaves hidden files out', () => {
   let symlinks = true;
 
   beforeAll(() => {
-    root = realpathSync(mkdtempSync(join(tmpdir(), 'browsedown-hidden-')));
+    // The native realpath, as the product uses: on Windows it expands 8.3 short names
+    // (C:\\Users\\RUNNER~1), so hidden paths compare equal to what discovery resolves.
+    root = realpathSync.native(mkdtempSync(join(tmpdir(), 'browsedown-hidden-')));
     for (const file of [
       'README.md',
       'guide.md',

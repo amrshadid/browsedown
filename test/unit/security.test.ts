@@ -123,7 +123,10 @@ beforeAll(async () => {
   } catch {
     aliasCreated = false; // Windows without symlink rights.
   }
-  hiddenPaths = [realpathSync(join(docs, 'private')), realpathSync(join(docs, 'note.md'))];
+  hiddenPaths = [
+    realpathSync.native(join(docs, 'private')),
+    realpathSync.native(join(docs, 'note.md')),
+  ];
   assets = mkdtempSync(join(tmpdir(), 'browsedown-assets-'));
   for (const name of [
     'github-markdown.css',
