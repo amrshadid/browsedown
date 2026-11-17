@@ -55,6 +55,53 @@
         "command": "browsedown.stopAll",
         "title": "Stop All Previews",
         "category": "Browsedown"
+      },
+      {
+        "command": "browsedown.openAll",
+        "title": "Open All in Browser",
+        "category": "Browsedown",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "browsedown.refreshDocs",
+        "title": "Refresh Docs",
+        "category": "Browsedown",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "browsedown.showIgnored",
+        "title": "Show Ignored Folders",
+        "category": "Browsedown",
+        "icon": "$(eye)"
+      },
+      {
+        "command": "browsedown.hideIgnored",
+        "title": "Hide Ignored Folders",
+        "category": "Browsedown",
+        "icon": "$(eye-closed)"
+      },
+      {
+        "command": "browsedown.openDoc",
+        "title": "Open in Browser",
+        "category": "Browsedown"
+      },
+      {
+        "command": "browsedown.openFolder",
+        "title": "Open Folder in Browser",
+        "category": "Browsedown",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "browsedown.openInEditor",
+        "title": "Open in Editor",
+        "category": "Browsedown",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "browsedown.openEditor",
+        "title": "Open in Browser",
+        "category": "Browsedown",
+        "icon": "$(link-external)"
       }
     ],
     "menus": {
@@ -73,9 +120,143 @@
         {
           "command": "browsedown.stopAll",
           "when": "!isWeb && !remoteName"
+        },
+        {
+          "command": "browsedown.openDoc",
+          "when": "false"
+        },
+        {
+          "command": "browsedown.openFolder",
+          "when": "false"
+        },
+        {
+          "command": "browsedown.openInEditor",
+          "when": "false"
+        },
+        {
+          "command": "browsedown.openAll",
+          "when": "!isWeb && !remoteName"
+        },
+        {
+          "command": "browsedown.refreshDocs",
+          "when": "!isWeb && !remoteName"
+        },
+        {
+          "command": "browsedown.showIgnored",
+          "when": "!isWeb && !remoteName && !browsedown.showIgnored"
+        },
+        {
+          "command": "browsedown.hideIgnored",
+          "when": "!isWeb && !remoteName && browsedown.showIgnored"
+        },
+        {
+          "command": "browsedown.openEditor",
+          "when": "resourceLangId == markdown && resourceScheme == file && !isWeb && !remoteName"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "browsedown.openAll",
+          "when": "view == browsedown.docs",
+          "group": "navigation@1"
+        },
+        {
+          "command": "browsedown.showIgnored",
+          "when": "view == browsedown.docs && !browsedown.showIgnored",
+          "group": "navigation@2"
+        },
+        {
+          "command": "browsedown.hideIgnored",
+          "when": "view == browsedown.docs && browsedown.showIgnored",
+          "group": "navigation@2"
+        },
+        {
+          "command": "browsedown.refreshDocs",
+          "when": "view == browsedown.docs",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "browsedown.openAll",
+          "when": "view == browsedown.docs && viewItem == browsedown.workspace",
+          "group": "inline"
+        },
+        {
+          "command": "browsedown.openFolder",
+          "when": "view == browsedown.docs && viewItem == browsedown.folder",
+          "group": "inline"
+        },
+        {
+          "command": "browsedown.openInEditor",
+          "when": "view == browsedown.docs && viewItem == browsedown.doc",
+          "group": "inline"
+        },
+        {
+          "command": "browsedown.openDoc",
+          "when": "view == browsedown.docs && viewItem == browsedown.doc",
+          "group": "navigation@1"
+        },
+        {
+          "command": "browsedown.openInEditor",
+          "when": "view == browsedown.docs && viewItem == browsedown.doc",
+          "group": "navigation@2"
+        },
+        {
+          "command": "browsedown.openFolder",
+          "when": "view == browsedown.docs && viewItem == browsedown.folder",
+          "group": "navigation@1"
+        },
+        {
+          "command": "browsedown.openAll",
+          "when": "view == browsedown.docs && viewItem == browsedown.workspace",
+          "group": "navigation@1"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "browsedown.openEditor",
+          "when": "resourceLangId == markdown && resourceScheme == file && !isWeb && !remoteName",
+          "group": "navigation"
         }
       ]
-    }
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "browsedown",
+          "title": "Browsedown",
+          "icon": "media/activity.svg"
+        }
+      ]
+    },
+    "views": {
+      "browsedown": [
+        {
+          "id": "browsedown.docs",
+          "name": "Docs",
+          "when": "!isWeb && !remoteName",
+          "contextualTitle": "Browsedown"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "browsedown.docs",
+        "contents": "Open a folder to list its Markdown docs here and read them in your browser.\n[Open Folder](command:workbench.action.files.openFolder)",
+        "when": "workbenchState == empty"
+      },
+      {
+        "view": "browsedown.docs",
+        "contents": "No Markdown files found.\nFolders that .gitignore hides are left out. Show them with the eye button above, or right-click a folder in the Explorer and choose Open in Browser.",
+        "when": "workbenchState != empty && !browsedown.showIgnored"
+      },
+      {
+        "view": "browsedown.docs",
+        "contents": "No Markdown files found, including in ignored folders.",
+        "when": "workbenchState != empty && browsedown.showIgnored"
+      }
+    ]
   },
   "scripts": {
     "build": "node esbuild.mjs",

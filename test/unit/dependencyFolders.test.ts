@@ -9,7 +9,7 @@ import { dirname, join } from 'node:path';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { discoverFolder } from '../../src/adapters/discovery';
+import { discoverDocs, discoverFolder } from '../../src/adapters/discovery';
 import { walkFolder } from '../../src/adapters/walker';
 import {
   hasDependencyMarker,
@@ -258,5 +258,10 @@ describe('discovery across stacks, in git', () => {
     const result = await discoverFolder(root, { trusted: true });
     expect(result.discovery).toBe('git');
     expect([...result.files].sort()).toEqual([...KEPT].sort());
+  });
+
+  it('Show Ignored Folders adds ignored docs, never an ignored environment or cache', async () => {
+    const result = await discoverDocs(root, { trusted: true, includeIgnored: true });
+    expect([...result.files].sort()).toEqual([...KEPT, 'notes/plan.md'].sort());
   });
 });

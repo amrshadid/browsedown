@@ -1,6 +1,7 @@
 /**
  * Preview sessions: one per right-click, held in memory only, never persisted.
- * Opening the same folder twice gives two independent sessions.
+ * Opening the same folder twice gives two independent sessions. The docs sidebar
+ * keeps and reuses one session per workspace folder instead (ADR 0008).
  */
 import { renderTreeList } from './pages';
 import { fileUrl } from './routes';
@@ -27,6 +28,8 @@ export interface Session {
   discovery: Discovery | undefined;
   /** True when the walk stopped at its entry cap. */
   truncated: boolean;
+  /** A docs-sidebar session that also lists ignored Markdown; a reload rediscovers the same way. */
+  readonly includeIgnored?: boolean;
   /**
    * True right after discovery. The first load of the entry page then uses that
    * result instead of scanning again; later loads (a reload) rebuild the tree.

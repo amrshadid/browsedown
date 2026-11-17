@@ -47,6 +47,26 @@ the folder or file you chose. More in [docs/why.md](docs/why.md).
 | Markdown file | That page, with working links to other files nearby. No tree.                                                    |
 | YAML file     | Syntax-highlighted source in the same layout.                                                                    |
 
+Or use the **Browsedown** view in the Activity Bar (the book icon). It lists every Markdown
+file in your workspace, the way git sees them:
+
+- **Open All in Browser** (the arrow at the top) opens the whole list in the browser, with
+  the tree.
+- **Click a doc** to open it in that same view, with the tree beside it.
+- **Show Ignored Folders** (the eye) adds the docs in folders `.gitignore` hides, such as
+  agent notes. Each ignored folder is listed as if you had opened it yourself.
+  Installed packages, virtual environments and build output stay out (see below).
+- Hover a folder to open just that folder, or a doc to open it in the editor.
+
+The list is gathered when the view is open and updates when files change in VS Code; the
+refresh button gathers it again.
+
+Editing a Markdown file? The **Open in Browser** button in the editor's title bar opens it
+in the same view, with the tree. The page doesn't reload by itself: reload the tab after you
+save. For a live preview of diagrams while you write, VS Code's own preview with the
+[Markdown Preview Mermaid Support](https://marketplace.visualstudio.com/items?itemName=bierner.markdown-mermaid)
+extension is the right tool.
+
 Relative links, heading anchors and local images resolve from the file that contains them,
 the way they do on GitHub. Links are ordinary browser links, so Back, Forward, copy link and
 open-in-new-tab all work.
@@ -72,6 +92,10 @@ which one it is, never a silent error or the wrong file.
 | Command                           | Where                                                 |
 | --------------------------------- | ----------------------------------------------------- |
 | **Open in Browser**               | Right-click a folder, Markdown or YAML file           |
+| **Open in Browser** (editor)      | The title bar of an open Markdown file                |
+| **Open All in Browser**           | The Browsedown view, or the Command Palette           |
+| **Show / Hide Ignored Folders**   | The Browsedown view, or the Command Palette           |
+| **Refresh Docs**                  | The Browsedown view, or the Command Palette           |
 | **Browsedown: Stop All Previews** | Command Palette. Closes the local server immediately. |
 
 Previews also stop when VS Code closes. Nothing runs when no preview is open.
@@ -88,6 +112,8 @@ Automatic discovery follows git. Opening something yourself is an explicit choic
 | Open an ignored file, such as `drafts/notes.md`            | That file is rendered. Other listings are unchanged.                                                                   |
 | Open an ignored folder, such as `drafts/`                  | Its Markdown is listed. The rule that hides the folder itself is overridden; `.gitignore` files inside it still apply. |
 | Follow a link to an ignored Markdown or YAML file in scope | The linked file is rendered. It stays out of the tree.                                                                 |
+| The Browsedown view                                        | The whole workspace, listed like opening its folder: ignored files stay out.                                           |
+| The Browsedown view with **Show Ignored Folders**          | Also the Markdown in ignored folders and files, each folder listed as if you opened it.                                |
 
 A tracked file stays visible even if an ignore pattern matches it later, as in git
 ([gitignore documentation](https://git-scm.com/docs/gitignore)).

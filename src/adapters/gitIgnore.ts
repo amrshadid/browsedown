@@ -91,6 +91,50 @@ export class GitIgnore {
     }
   }
 
+  /**
+   * Untracked paths that ignore rules hide, with fully ignored folders collapsed
+   * to one `folder/` entry (`--directory`). A folder that also holds tracked
+   * files isn't collapsed: its ignored files and subfolders are listed instead.
+   * Used by the sidebar's "Show ignored folders" (ADR 0008).
+   */
+  async listIgnored(): Promise<RelPath[]> {
+    const out = await run(this.git, this.cwd, [
+      'ls-files',
+      '-z',
+      '--others',
+      '--ignored',
+      '--exclude-standard',
+      '--directory',
+      '--',
+      '.',
+    ]);
+    return splitNul(out).map((p) => canonicalPath(p));
+  }
+
+  /**
+   * Which of `folders` (relative, each ending in `/`) ignore rules hide, judged
+   * from the rules alone (`--no-index`, as in {@link isFolderIgnored}).
+   */
+  async ignoredFolders(folders: readonly RelPath[]): Promise<RelPath[]> {
+    if (folders.length === 0) {
+      return [];
+    }
+    try {
+      const out = await run(
+        this.git,
+        this.cwd,
+        ['check-ignore', '-z', '--no-index', '--stdin'],
+        `${folders.join('\0')}\0`,
+      );
+      return splitNul(out).map((p) => canonicalPath(p));
+    } catch (error) {
+      if (isExitCode(error, 1)) {
+        return []; // None of them is ignored.
+      }
+      throw error;
+    }
+  }
+
   /** `ls-files` with `flags`, minus tracked files deleted from disk, without duplicates. */
   private async existing(flags: readonly string[]): Promise<RelPath[]> {
     const [listed, deleted] = await Promise.all([
@@ -128,9 +172,18 @@ async function resolveGitExecutable(): Promise<string | undefined> {
   return undefined;
 }
 
-function run(git: string, cwd: string, args: readonly string[]): Promise<string> {
+/**
+ * Runs git without a shell; `input`, when given, is written to its stdin.
+ * Exported for tests only.
+ */
+export function run(
+  git: string,
+  cwd: string,
+  args: readonly string[],
+  input?: string,
+): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(
+    const child = execFile(
       git,
       [...SAFE_CONFIG, ...args],
       { cwd, maxBuffer: MAX_BUFFER, encoding: 'utf8', windowsHide: true },
@@ -142,6 +195,14 @@ function run(git: string, cwd: string, args: readonly string[]): Promise<string>
         }
       },
     );
+    if (input !== undefined && child.stdin !== null) {
+      // If git exits before reading everything, the write fails with EPIPE. The exit
+      // status already reports the failure through the callback above, so the pipe
+      // error needs only to be handled, or it is an uncaught exception.
+      // https://nodejs.org/api/child_process.html#subprocessstdin
+      child.stdin.on('error', () => undefined);
+      child.stdin.end(input);
+    }
   });
 }
 
