@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-18
+
+First stable release, on the Visual Studio Marketplace and Open VSX. It has everything from
+the pilot pre-releases: Markdown and YAML in the browser with a scoped tree, Mermaid
+diagrams, the Browsedown sidebar, dependency folders skipped in every stack, and Hide in
+Browsedown.
+
+### Changed
+
+- **Install from the Marketplace or Open VSX.** Search for Browsedown in the Extensions view.
+  The `.vsix` file is still attached to each GitHub release.
+- No longer marked as a preview.
+
 ## [0.4.0] - 2026-11-17
 
 Fourth pilot pre-release.
@@ -86,7 +99,8 @@ First pilot pre-release.
   No remote images, no network calls, no telemetry. Read-only.
 - Logs hold lifecycle events and error codes only: no paths, tokens or file contents.
 
-[Unreleased]: https://github.com/amrshadid/browsedown/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/amrshadid/browsedown/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/amrshadid/browsedown/compare/v0.4.0...v1.0.0
 [0.4.0]: https://github.com/amrshadid/browsedown/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/amrshadid/browsedown/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/amrshadid/browsedown/compare/v0.1.0...v0.2.0
